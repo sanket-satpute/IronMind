@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">IronMind</string>
+    <string name="welcome_title">No excuses. Just execution.</string>
+    <string name="onboarding_start">Start Building Discipline</string>
+    <string name="task_done">Done</string>
+    <string name="task_skip">Skip</string>
+    <string name="streak">Streak</string>
+    <string name="punishment_title">Face the Consequences</string>
+    <string name="skip_sms_message">%1$s just skipped \"%2$s\". Hold them accountable.</string>
+    <string name="accessibility_description">IronMind needs this permission to block distracting apps during your focus sessions. This is essential for the app to enforce your own rules.</string>
+    <string name="punishment_notif_title">Punishment In Progress</string>
+    <string name="punishment_notif_text">Your phone is locked. This is the consequence of skipping a task.</string>
+    <string name="punishment_channel_name">Punishment Lockout</string>
+    <string name="punishment_channel_desc">Shows the persistent notification while your phone is locked during a punishment.</string>
+</resources>

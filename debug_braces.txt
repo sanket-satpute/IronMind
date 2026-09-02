@@ -1,0 +1,611 @@
+  1 |  0 | package com.sanket_satpute_20.ironmind.social
+  3 |  0 | import androidx.compose.foundation.BorderStroke
+  4 |  0 | import androidx.compose.foundation.background
+  5 |  0 | import androidx.compose.foundation.layout.Arrangement
+  6 |  0 | import androidx.compose.foundation.layout.Box
+  7 |  0 | import androidx.compose.foundation.layout.Column
+  8 |  0 | import androidx.compose.foundation.layout.Row
+  9 |  0 | import androidx.compose.foundation.layout.Spacer
+ 10 |  0 | import androidx.compose.foundation.layout.fillMaxSize
+ 11 |  0 | import androidx.compose.foundation.layout.fillMaxWidth
+ 12 |  0 | import androidx.compose.foundation.layout.height
+ 13 |  0 | import androidx.compose.foundation.layout.padding
+ 14 |  0 | import androidx.compose.foundation.layout.size
+ 15 |  0 | import androidx.compose.foundation.rememberScrollState
+ 16 |  0 | import androidx.compose.foundation.shape.CircleShape
+ 17 |  0 | import androidx.compose.foundation.shape.RoundedCornerShape
+ 18 |  0 | import androidx.compose.foundation.verticalScroll
+ 19 |  0 | import androidx.compose.material.icons.Icons
+ 20 |  0 | import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+ 21 |  0 | import androidx.compose.material.icons.rounded.CloudDone
+ 22 |  0 | import androidx.compose.material.icons.rounded.ContactPhone
+ 23 |  0 | import androidx.compose.material.icons.rounded.Groups
+ 24 |  0 | import androidx.compose.material.icons.rounded.Lock
+ 25 |  0 | import androidx.compose.material.icons.rounded.PrivacyTip
+ 26 |  0 | import androidx.compose.material3.Button
+ 27 |  0 | import androidx.compose.material3.ButtonDefaults
+ 28 |  0 | import androidx.compose.material3.CenterAlignedTopAppBar
+ 29 |  0 | import androidx.compose.material3.CircularProgressIndicator
+ 30 |  0 | import androidx.compose.material3.ExperimentalMaterial3Api
+ 31 |  0 | import androidx.compose.material3.HorizontalDivider
+ 32 |  0 | import androidx.compose.material3.Icon
+ 33 |  0 | import androidx.compose.material3.IconButton
+ 34 |  0 | import androidx.compose.material3.MaterialTheme
+ 35 |  0 | import androidx.compose.material3.Scaffold
+ 36 |  0 | import androidx.compose.material3.Surface
+ 37 |  0 | import androidx.compose.material3.Switch
+ 38 |  0 | import androidx.compose.material3.SwitchDefaults
+ 39 |  0 | import androidx.compose.material3.Text
+ 40 |  0 | import androidx.compose.material3.TopAppBarDefaults
+ 41 |  0 | import androidx.compose.runtime.Composable
+ 42 |  0 | import androidx.compose.runtime.LaunchedEffect
+ 43 |  0 | import androidx.compose.runtime.getValue
+ 44 |  0 | import androidx.compose.runtime.mutableStateOf
+ 45 |  0 | import androidx.compose.runtime.produceState
+ 46 |  0 | import androidx.compose.runtime.remember
+ 47 |  0 | import androidx.compose.runtime.setValue
+ 48 |  0 | import androidx.compose.ui.Alignment
+ 49 |  0 | import androidx.compose.ui.Modifier
+ 50 |  0 | import androidx.compose.ui.draw.blur
+ 51 |  0 | import androidx.compose.ui.graphics.Brush
+ 52 |  0 | import androidx.compose.ui.graphics.Color
+ 53 |  0 | import androidx.compose.ui.text.font.FontWeight
+ 54 |  0 | import androidx.compose.ui.text.style.TextAlign
+ 55 |  0 | import androidx.compose.ui.unit.dp
+ 56 |  0 | import androidx.compose.ui.unit.sp
+ 57 |  0 | import androidx.compose.ui.platform.LocalContext
+ 58 |  0 | import com.google.firebase.auth.ktx.auth
+ 59 |  0 | import com.google.firebase.ktx.Firebase
+ 60 |  0 | import com.sanket_satpute_20.ironmind.data.PrefManager
+ 61 |  0 | import kotlinx.coroutines.Dispatchers
+ 62 |  0 | import kotlinx.coroutines.withContext
+ 64 |  0 | @OptIn(ExperimentalMaterial3Api::class)
+ 65 |  0 | @Composable
+ 66 |  0 | fun IronCircleScreen(
+ 67 |  0 |     onBack: () -> Unit,
+ 68 |  0 |     onDiscoverContacts: () -> Unit,
+ 69 |  0 |     onOpenNetwork: () -> Unit,
+ 70 |  0 |     onOpenPremiumUpgrade: () -> Unit
+ 71 |  0 | ) {
+ 72 |  1 |     val context = LocalContext.current
+ 73 |  1 |     val prefs = remember { PrefManager.getInstance(context) }
+ 74 |  1 |     val repository = remember { FirebaseSocialRepository() }
+ 75 |  1 |     val firebaseUser = Firebase.auth.currentUser
+ 77 |  1 |     var ironCircleEnabled by remember { mutableStateOf(prefs.ironCircleEnabled) }
+ 78 |  1 |     var discoverableByContacts by remember { mutableStateOf(prefs.socialDiscoverable) }
+ 79 |  1 |     var shareStreakBand by remember { mutableStateOf(prefs.socialShareStreakBand) }
+ 80 |  1 |     var shareConsistencyTrend by remember { mutableStateOf(prefs.socialShareConsistencyTrend) }
+ 81 |  1 |     var shareFiveAmWeekly by remember { mutableStateOf(prefs.socialShareFiveAmWeekly) }
+ 82 |  1 |     var shareTitles by remember { mutableStateOf(prefs.socialShareTitles) }
+ 83 |  1 |     var syncInFlight by remember { mutableStateOf(false) }
+ 84 |  1 |     var syncMessage by remember { mutableStateOf("Your private accountability preview is ready.") }
+ 85 |  1 |     val overview by produceState<SocialOverview?>(initialValue = null, syncInFlight) {
+ 86 |  2 |         value = runCatching { repository.getSocialOverview() }.getOrNull()
+ 87 |  2 |     }
+ 89 |  1 |     val previewProfile by produceState<SocialProfile?>(initialValue = null, ironCircleEnabled, shareStreakBand, shareConsistencyTrend, shareFiveAmWeekly, shareTitles) {
+ 90 |  2 |         val previewSettings = SocialPrivacySettings(
+ 91 |  2 |             ironCircleEnabled = ironCircleEnabled,
+ 92 |  2 |             discoverableByContacts = discoverableByContacts,
+ 93 |  2 |             shareStreakBand = shareStreakBand,
+ 94 |  2 |             shareConsistencyTrend = shareConsistencyTrend,
+ 95 |  2 |             shareFiveAmWeekly = shareFiveAmWeekly,
+ 96 |  2 |             shareTitles = shareTitles
+ 97 |  2 |         )
+ 98 |  2 |         value = withContext(Dispatchers.IO) {
+ 99 |  3 |             SocialProfileBuilder.build(context, previewSettings)
+100 |  3 |         }
+101 |  2 |     }
+103 |  1 |     fun persistSettings() {
+104 |  2 |         prefs.ironCircleEnabled = ironCircleEnabled
+105 |  2 |         prefs.socialDiscoverable = discoverableByContacts
+106 |  2 |         prefs.socialShareStreakBand = shareStreakBand
+107 |  2 |         prefs.socialShareConsistencyTrend = shareConsistencyTrend
+108 |  2 |         prefs.socialShareFiveAmWeekly = shareFiveAmWeekly
+109 |  2 |         prefs.socialShareTitles = shareTitles
+110 |  2 |     }
+112 |  1 |     Scaffold(
+113 |  1 |         containerColor = Color.Black,
+114 |  1 |         topBar = {
+115 |  2 |             CenterAlignedTopAppBar(
+116 |  2 |                 title = {
+117 |  3 |                     Text(
+118 |  3 |                         "IRON CIRCLE",
+119 |  3 |                         color = Color.White,
+120 |  3 |                         fontWeight = FontWeight.Black,
+121 |  3 |                         letterSpacing = 2.sp
+122 |  3 |                     )
+123 |  3 |                 },
+124 |  2 |                 navigationIcon = {
+125 |  3 |                     IconButton(onClick = onBack) {
+126 |  4 |                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null, tint = Color.White)
+127 |  4 |                     }
+128 |  3 |                 },
+129 |  2 |                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Black)
+130 |  2 |             )
+131 |  2 |         }
+132 |  1 |     ) { innerPadding ->
+133 |  2 |         if (!prefs.isPremium) {
+134 |  3 |             Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+135 |  4 |                 Column(
+136 |  4 |                     modifier = Modifier
+137 |  4 |                         .fillMaxSize()
+138 |  4 |                         .background(Color.Black)
+139 |  4 |                         .blur(16.dp)
+140 |  4 |                         .padding(horizontal = 20.dp, vertical = 12.dp),
+141 |  4 |                     verticalArrangement = Arrangement.spacedBy(16.dp)
+142 |  4 |                 ) {
+143 |  5 |                     Surface(
+144 |  5 |                         color = Color.Transparent,
+145 |  5 |                         shape = RoundedCornerShape(28.dp),
+146 |  5 |                         border = BorderStroke(1.dp, Color(0xFF5ED1B6).copy(alpha = 0.22f)),
+147 |  5 |                         modifier = Modifier.fillMaxWidth().height(200.dp)
+148 |  5 |                     ) {}
+149 |  5 |                 }
+150 |  4 |                 Box(
+151 |  4 |                     modifier = Modifier
+152 |  4 |                         .fillMaxSize()
+153 |  4 |                         .background(Color.Black.copy(alpha = 0.5f)),
+154 |  4 |                     contentAlignment = Alignment.Center
+155 |  4 |                 ) {
+156 |  5 |                     Column(
+157 |  5 |                         horizontalAlignment = Alignment.CenterHorizontally,
+158 |  5 |                         modifier = Modifier.padding(24.dp)
+159 |  5 |                     ) {
+160 |  6 |                         Icon(Icons.Rounded.Lock, contentDescription = null, tint = Color(0xFFD4AF37), modifier = Modifier.size(64.dp))
+161 |  6 |                         Spacer(modifier = Modifier.height(16.dp))
+162 |  6 |                         Text("PRO NETWORK", color = Color(0xFFD4AF37), fontWeight = FontWeight.Black, fontSize = 20.sp)
+163 |  6 |                         Spacer(modifier = Modifier.height(8.dp))
+164 |  6 |                         Text("Iron Circle is an advanced accountability tool reserved for IronMind Pro members.", color = Color.Gray, textAlign = TextAlign.Center)
+165 |  6 |                         Spacer(modifier = Modifier.height(24.dp))
+166 |  6 |                         Button(
+167 |  6 |                             onClick = onOpenPremiumUpgrade,
+168 |  6 |                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD4AF37)),
+169 |  6 |                             shape = RoundedCornerShape(12.dp)
+170 |  6 |                         ) {
+171 |  7 |                             Text("UNLOCK PRO", color = Color.Black, fontWeight = FontWeight.Bold)
+172 |  7 |                         }
+173 |  6 |                     }
+174 |  5 |                 }
+175 |  4 |             }
+176 |  3 |         } else {
+177 |  3 |             Column(
+178 |  3 |                 modifier = Modifier
+179 |  3 |                     .fillMaxSize()
+180 |  3 |                     .background(Color.Black)
+181 |  3 |                     .padding(innerPadding)
+182 |  3 |                     .verticalScroll(rememberScrollState())
+183 |  3 |                     .padding(horizontal = 20.dp, vertical = 12.dp),
+184 |  3 |                 verticalArrangement = Arrangement.spacedBy(16.dp)
+185 |  3 |             ) {
+186 |  4 |             Surface(
+187 |  4 |                 color = Color.Transparent,
+188 |  4 |                 shape = RoundedCornerShape(28.dp),
+189 |  4 |                 border = BorderStroke(1.dp, Color(0xFF5ED1B6).copy(alpha = 0.22f)),
+190 |  4 |                 modifier = Modifier.fillMaxWidth()
+191 |  4 |             ) {
+192 |  5 |                 Box(
+193 |  5 |                     modifier = Modifier
+194 |  5 |                         .background(
+195 |  5 |                             Brush.linearGradient(
+196 |  5 |                                 listOf(Color(0xFF071B17), Color(0xFF101826), Color(0xFF15110B))
+197 |  5 |                             )
+198 |  5 |                         )
+199 |  5 |                         .padding(24.dp)
+200 |  5 |                 ) {
+201 |  6 |                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+202 |  7 |                         Row(verticalAlignment = Alignment.CenterVertically) {
+203 |  8 |                             Box(
+204 |  8 |                                 modifier = Modifier
+205 |  8 |                                     .size(44.dp)
+206 |  8 |                                     .background(Color(0xFF5ED1B6).copy(alpha = 0.15f), CircleShape),
+207 |  8 |                                 contentAlignment = Alignment.Center
+208 |  8 |                             ) {
+209 |  9 |                                 Icon(Icons.Rounded.Groups, contentDescription = null, tint = Color(0xFF5ED1B6))
+210 |  9 |                             }
+211 |  8 |                             Spacer(modifier = Modifier.size(12.dp))
+212 |  8 |                             Column {
+213 |  9 |                                 Text("PRIVATE ACCOUNTABILITY", color = Color(0xFF5ED1B6), fontSize = 11.sp, fontWeight = FontWeight.Black)
+214 |  9 |                                 Text("Keep a small trusted circle, compare safely, and protect what stays private.", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp, lineHeight = 24.sp)
+215 |  9 |                             }
+216 |  8 |                         }
+217 |  7 |                         Text(
+218 |  7 |                             "Iron Circle uses mutual opt-in and only shares privacy-safe signals: streak range, consistency trend, verified 5 AM this week, and titles.",
+219 |  7 |                             color = Color(0xFFBAC5D1),
+220 |  7 |                             fontSize = 13.sp,
+221 |  7 |                             lineHeight = 20.sp
+222 |  7 |                         )
+223 |  7 |                     }
+224 |  6 |                 }
+225 |  5 |             }
+227 |  4 |             Surface(
+228 |  4 |                 color = Color(0xFF0F1216),
+229 |  4 |                 shape = RoundedCornerShape(22.dp),
+230 |  4 |                 border = BorderStroke(1.dp, Color(0xFF7AC7FF).copy(alpha = 0.18f)),
+231 |  4 |                 modifier = Modifier.fillMaxWidth()
+232 |  4 |             ) {
+233 |  5 |                 Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+234 |  6 |                     Text("GET STARTED", color = Color(0xFF7AC7FF), fontWeight = FontWeight.Black, fontSize = 11.sp, letterSpacing = 1.sp)
+235 |  6 |                     CircleStepRow(
+236 |  6 |                         index = "1",
+237 |  6 |                         title = "Turn on Iron Circle and save your privacy settings",
+238 |  6 |                         done = ironCircleEnabled
+239 |  6 |                     )
+240 |  6 |                     CircleStepRow(
+241 |  6 |                         index = "2",
+242 |  6 |                         title = "Add trusted people through contacts or invite code",
+243 |  6 |                         done = (overview?.friendCount ?: 0) > 0 || (overview?.pendingRequestCount ?: 0) > 0
+244 |  6 |                     )
+245 |  6 |                     CircleStepRow(
+246 |  6 |                         index = "3",
+247 |  6 |                         title = "Start using comparisons and quiet encouragement",
+248 |  6 |                         done = (overview?.friendCount ?: 0) > 0 && (overview?.recentReactionCount ?: 0) > 0
+249 |  6 |                     )
+250 |  6 |                     overview?.let {
+251 |  7 |                         Text(
+252 |  7 |                             buildNextStepMessage(
+253 |  7 |                                 ironCircleEnabled = ironCircleEnabled,
+254 |  7 |                                 overview = it
+255 |  7 |                             ),
+256 |  7 |                             color = Color(0xFFCFDAE4),
+257 |  7 |                             fontSize = 12.sp,
+258 |  7 |                             lineHeight = 18.sp
+259 |  7 |                         )
+260 |  7 |                     }
+261 |  6 |                 }
+262 |  5 |             }
+264 |  4 |             if (firebaseUser == null || firebaseUser.isAnonymous) {
+265 |  5 |                 Surface(
+266 |  5 |                     color = Color(0xFF1A1200),
+267 |  5 |                     shape = RoundedCornerShape(18.dp),
+268 |  5 |                     border = BorderStroke(1.dp, Color(0xFFFFB300).copy(alpha = 0.28f)),
+269 |  5 |                     modifier = Modifier.fillMaxWidth()
+270 |  5 |                 ) {
+271 |  6 |                     Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+272 |  7 |                         Icon(Icons.Rounded.Lock, contentDescription = null, tint = Color(0xFFFFB300))
+273 |  7 |                         Spacer(modifier = Modifier.size(12.dp))
+274 |  7 |                         Text(
+275 |  7 |                             "Link your identity before contact discovery is available. You can still choose your privacy settings and preview what Iron Circle will share.",
+276 |  7 |                             color = Color.White.copy(alpha = 0.85f),
+277 |  7 |                             fontSize = 12.sp,
+278 |  7 |                             lineHeight = 18.sp
+279 |  7 |                         )
+280 |  7 |                     }
+281 |  6 |                 }
+282 |  5 |             }
+284 |  4 |             Surface(
+285 |  4 |                 color = Color(0xFF0E0F12),
+286 |  4 |                 shape = RoundedCornerShape(22.dp),
+287 |  4 |                 border = BorderStroke(1.dp, Color.White.copy(alpha = 0.07f)),
+288 |  4 |                 modifier = Modifier.fillMaxWidth()
+289 |  4 |             ) {
+290 |  5 |                 Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+291 |  6 |                     Text("PRIVACY BASICS", color = Color(0xFF7AC7FF), fontWeight = FontWeight.Black, fontSize = 11.sp, letterSpacing = 1.sp)
+292 |  6 |                     PrivacyToggleRow(
+293 |  6 |                         title = "Enable Iron Circle",
+294 |  6 |                         subtitle = "Turn on the private accountability layer and create your share-safe profile.",
+295 |  6 |                         checked = ironCircleEnabled,
+296 |  6 |                         onCheckedChange = { ironCircleEnabled = it }
+297 |  6 |                     )
+298 |  6 |                     HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+299 |  6 |                     PrivacyToggleRow(
+300 |  6 |                         title = "Be Discoverable By Contacts",
+301 |  6 |                         subtitle = "Only opted-in users can be found by trusted people through contact matching.",
+302 |  6 |                         checked = discoverableByContacts,
+303 |  6 |                         enabled = ironCircleEnabled,
+304 |  6 |                         onCheckedChange = { discoverableByContacts = it }
+305 |  6 |                     )
+306 |  6 |                 }
+307 |  5 |             }
+309 |  4 |             Surface(
+310 |  4 |                 color = Color(0xFF0D1117),
+311 |  4 |                 shape = RoundedCornerShape(22.dp),
+312 |  4 |                 border = BorderStroke(1.dp, Color(0xFF5ED1B6).copy(alpha = 0.16f)),
+313 |  4 |                 modifier = Modifier.fillMaxWidth()
+314 |  4 |             ) {
+315 |  5 |                 Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+316 |  6 |                     Row(verticalAlignment = Alignment.CenterVertically) {
+317 |  7 |                         Icon(Icons.Rounded.PrivacyTip, contentDescription = null, tint = Color(0xFF5ED1B6))
+318 |  7 |                         Spacer(modifier = Modifier.size(10.dp))
+319 |  7 |                     Text("SHARED SIGNALS", color = Color.White, fontWeight = FontWeight.Black, fontSize = 16.sp)
+320 |  7 |                     }
+321 |  6 |                     Text("Control the only metrics trusted people can see. Tasks, punishments, moods, contracts, and recovery logs stay private.", color = Color(0xFFAAB5BF), fontSize = 12.sp, lineHeight = 18.sp)
+322 |  6 |                     PrivacyToggleRow("Streak Band", "Share a privacy-safe range instead of an exact streak count.", shareStreakBand, ironCircleEnabled) { shareStreakBand = it }
+323 |  6 |                     PrivacyToggleRow("Consistency Trend", "Show whether your recent discipline is rising, stable, or slipping.", shareConsistencyTrend, ironCircleEnabled) { shareConsistencyTrend = it }
+324 |  6 |                     PrivacyToggleRow("5 AM Verified This Week", "Share your verified 5 AM count for the last 7 days.", shareFiveAmWeekly, ironCircleEnabled) { shareFiveAmWeekly = it }
+325 |  6 |                     PrivacyToggleRow("Titles", "Share Iron Status and earned titles like Hell Week Survivor.", shareTitles, ironCircleEnabled) { shareTitles = it }
+326 |  6 |                 }
+327 |  5 |             }
+329 |  4 |             Surface(
+330 |  4 |                 color = Color(0xFF0F0F10),
+331 |  4 |                 shape = RoundedCornerShape(24.dp),
+332 |  4 |                 border = BorderStroke(1.dp, Color(0xFFFFD54F).copy(alpha = 0.24f)),
+333 |  4 |                 modifier = Modifier.fillMaxWidth()
+334 |  4 |             ) {
+335 |  5 |                 Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+336 |  6 |                     Text("PROFILE PREVIEW", color = Color(0xFFFFD54F), fontWeight = FontWeight.Black, fontSize = 11.sp, letterSpacing = 1.sp)
+337 |  6 |                     previewProfile?.let { profile ->
+338 |  7 |                         SocialPreviewCard(profile = profile, enabled = ironCircleEnabled)
+339 |  7 |                     } ?: Box(modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
+340 |  7 |                         CircularProgressIndicator(color = Color(0xFFFFD54F))
+341 |  7 |                     }
+342 |  6 |                 }
+343 |  5 |             }
+345 |  4 |             Surface(
+346 |  4 |                 color = Color(0xFF09131A),
+347 |  4 |                 shape = RoundedCornerShape(18.dp),
+348 |  4 |                 border = BorderStroke(1.dp, Color(0xFF7AC7FF).copy(alpha = 0.22f)),
+349 |  4 |                 modifier = Modifier.fillMaxWidth()
+350 |  4 |             ) {
+351 |  5 |                 Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+352 |  6 |                     Icon(Icons.Rounded.CloudDone, contentDescription = null, tint = Color(0xFF7AC7FF))
+353 |  6 |                     Spacer(modifier = Modifier.size(12.dp))
+354 |  6 |                     Column {
+355 |  7 |                         Text(syncMessage, color = Color.White.copy(alpha = 0.86f), fontSize = 12.sp, lineHeight = 18.sp)
+356 |  7 |                         overview?.let {
+357 |  8 |                             Text(
+358 |  8 |                                 "${it.friendCount} friends  •  ${it.pendingRequestCount} pending requests  •  ${it.recentReactionCount} recent signals",
+359 |  8 |                                 color = Color(0xFF8EA6B9),
+360 |  8 |                                 fontSize = 11.sp
+361 |  8 |                             )
+362 |  8 |                         }
+363 |  7 |                     }
+364 |  6 |                 }
+365 |  5 |             }
+367 |  4 |             Surface(
+368 |  4 |                 color = Color(0xFF0C1512),
+369 |  4 |                 shape = RoundedCornerShape(20.dp),
+370 |  4 |                 border = BorderStroke(1.dp, Color(0xFF5ED1B6).copy(alpha = 0.20f)),
+371 |  4 |                 modifier = Modifier.fillMaxWidth()
+372 |  4 |             ) {
+373 |  5 |                 Row(
+374 |  5 |                     modifier = Modifier
+375 |  5 |                         .fillMaxWidth()
+376 |  5 |                         .padding(18.dp),
+377 |  5 |                     verticalAlignment = Alignment.CenterVertically
+378 |  5 |                 ) {
+379 |  6 |                     Box(
+380 |  6 |                         modifier = Modifier
+381 |  6 |                             .size(42.dp)
+382 |  6 |                             .background(Color(0xFF5ED1B6).copy(alpha = 0.14f), CircleShape),
+383 |  6 |                         contentAlignment = Alignment.Center
+384 |  6 |                     ) {
+385 |  7 |                         Icon(Icons.Rounded.ContactPhone, contentDescription = null, tint = Color(0xFF5ED1B6))
+386 |  7 |                     }
+387 |  6 |                     Spacer(modifier = Modifier.size(12.dp))
+388 |  6 |                     Column(modifier = Modifier.weight(1f)) {
+389 |  7 |                         Text("DISCOVER CONTACTS", color = Color.White, fontWeight = FontWeight.Black, fontSize = 15.sp)
+390 |  7 |                         Text("Privately check who already uses IronMind and decide who belongs in your circle.", color = Color(0xFF9EB0A7), fontSize = 12.sp, lineHeight = 18.sp)
+391 |  7 |                     }
+392 |  6 |                     Button(
+393 |  6 |                         onClick = onDiscoverContacts,
+394 |  6 |                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5ED1B6)),
+395 |  6 |                         shape = RoundedCornerShape(14.dp)
+396 |  6 |                     ) {
+397 |  7 |                         Text("OPEN", color = Color.Black, fontWeight = FontWeight.Black)
+398 |  7 |                     }
+399 |  6 |                 }
+400 |  5 |             }
+402 |  4 |             Surface(
+403 |  4 |                 color = Color(0xFF10131A),
+404 |  4 |                 shape = RoundedCornerShape(20.dp),
+405 |  4 |                 border = BorderStroke(1.dp, Color(0xFF7AC7FF).copy(alpha = 0.22f)),
+406 |  4 |                 modifier = Modifier.fillMaxWidth()
+407 |  4 |             ) {
+408 |  5 |                 Row(
+409 |  5 |                     modifier = Modifier
+410 |  5 |                         .fillMaxWidth()
+411 |  5 |                         .padding(18.dp),
+412 |  5 |                     verticalAlignment = Alignment.CenterVertically
+413 |  5 |                 ) {
+414 |  6 |                     Box(
+415 |  6 |                         modifier = Modifier
+416 |  6 |                             .size(42.dp)
+417 |  6 |                             .background(Color(0xFF7AC7FF).copy(alpha = 0.14f), CircleShape),
+418 |  6 |                         contentAlignment = Alignment.Center
+419 |  6 |                     ) {
+420 |  7 |                         Icon(Icons.Rounded.Groups, contentDescription = null, tint = Color(0xFF7AC7FF))
+421 |  7 |                     }
+422 |  6 |                     Spacer(modifier = Modifier.size(12.dp))
+423 |  6 |                     Column(modifier = Modifier.weight(1f)) {
+424 |  7 |                         Text("MANAGE YOUR CIRCLE", color = Color.White, fontWeight = FontWeight.Black, fontSize = 15.sp)
+425 |  7 |                         Text("Handle requests, compare with friends, and add trusted people by invite code.", color = Color(0xFFA8B7C4), fontSize = 12.sp, lineHeight = 18.sp)
+426 |  7 |                     }
+427 |  6 |                     Button(
+428 |  6 |                         onClick = onOpenNetwork,
+429 |  6 |                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7AC7FF)),
+430 |  6 |                         shape = RoundedCornerShape(14.dp)
+431 |  6 |                     ) {
+432 |  7 |                         Text("OPEN", color = Color.Black, fontWeight = FontWeight.Black)
+433 |  7 |                     }
+434 |  6 |                 }
+435 |  5 |             }
+437 |  4 |             Button(
+438 |  4 |                 onClick = {
+439 |  5 |                     persistSettings()
+440 |  5 |                     syncInFlight = true
+441 |  5 |                     syncMessage = "Saving your Iron Circle setup..."
+442 |  5 |                 },
+443 |  4 |                 enabled = !syncInFlight,
+444 |  4 |                 modifier = Modifier
+445 |  4 |                     .fillMaxWidth()
+446 |  4 |                     .height(58.dp),
+447 |  4 |                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5ED1B6)),
+448 |  4 |                 shape = RoundedCornerShape(18.dp)
+449 |  4 |             ) {
+450 |  5 |                 if (syncInFlight) {
+451 |  6 |                     CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.Black, strokeWidth = 2.dp)
+452 |  6 |                     Spacer(modifier = Modifier.size(10.dp))
+453 |  6 |                 }
+454 |  5 |                 Text("SAVE IRON CIRCLE", color = Color.Black, fontWeight = FontWeight.Black)
+455 |  5 |             }
+457 |  4 |             Spacer(modifier = Modifier.height(8.dp))
+458 |  4 |         }
+459 |  3 |         }
+460 |  2 |     }
+462 |  1 |     LaunchedEffect(syncInFlight) {
+463 |  2 |         if (!syncInFlight) return@LaunchedEffect
+464 |  2 |         runCatching {
+465 |  3 |             repository.syncFoundation(context)
+466 |  3 |         }.onSuccess {
+467 |  3 |             syncMessage = "Iron Circle is saved. Discovery, invites, and friends can build on this safely."
+468 |  3 |         }.onFailure {
+469 |  3 |             syncMessage = "Saved locally, but cloud sync needs another try: ${it.message ?: "unknown error"}"
+470 |  3 |         }
+471 |  2 |         syncInFlight = false
+472 |  2 |     }
+473 |  1 | }
+475 |  0 | @Composable
+476 |  0 | private fun CircleStepRow(
+477 |  0 |     index: String,
+478 |  0 |     title: String,
+479 |  0 |     done: Boolean
+480 |  0 | ) {
+481 |  1 |     Row(verticalAlignment = Alignment.CenterVertically) {
+482 |  2 |         Surface(
+483 |  2 |             color = if (done) Color(0xFF5ED1B6).copy(alpha = 0.16f) else Color.White.copy(alpha = 0.05f),
+484 |  2 |             shape = CircleShape,
+485 |  2 |             border = BorderStroke(1.dp, if (done) Color(0xFF5ED1B6).copy(alpha = 0.40f) else Color.White.copy(alpha = 0.08f))
+486 |  2 |         ) {
+487 |  3 |             Text(
+488 |  3 |                 text = if (done) "✓" else index,
+489 |  3 |                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+490 |  3 |                 color = if (done) Color(0xFF5ED1B6) else Color(0xFFA0AFBB),
+491 |  3 |                 fontWeight = FontWeight.Black,
+492 |  3 |                 fontSize = 11.sp
+493 |  3 |             )
+494 |  3 |         }
+495 |  2 |         Spacer(modifier = Modifier.size(12.dp))
+496 |  2 |         Text(
+497 |  2 |             text = title,
+498 |  2 |             color = if (done) Color.White else Color(0xFFABB8C2),
+499 |  2 |             fontSize = 13.sp,
+500 |  2 |             lineHeight = 18.sp
+501 |  2 |         )
+502 |  2 |     }
+503 |  1 | }
+505 |  0 | private fun buildNextStepMessage(
+506 |  0 |     ironCircleEnabled: Boolean,
+507 |  0 |     overview: SocialOverview
+508 |  0 | ): String {
+509 |  1 |     return when {
+510 |  2 |         !ironCircleEnabled -> "Next move: turn on Iron Circle and save your privacy settings so discovery and invites can work."
+511 |  2 |         overview.friendCount == 0 && overview.pendingRequestCount == 0 -> "Next move: run contact discovery or use an invite code to add trusted people."
+512 |  2 |         overview.pendingRequestCount > 0 -> "Next move: open your circle and respond to pending requests so the connection becomes mutual."
+513 |  2 |         overview.recentReactionCount == 0 -> "Next move: compare with a friend or send your first supportive signal."
+514 |  2 |         else -> "Your circle is active. Keep the network small, trusted, and useful."
+515 |  2 |     }
+516 |  1 | }
+518 |  0 | @Composable
+519 |  0 | private fun PrivacyToggleRow(
+520 |  0 |     title: String,
+521 |  0 |     subtitle: String,
+522 |  0 |     checked: Boolean,
+523 |  0 |     enabled: Boolean = true,
+524 |  0 |     onCheckedChange: (Boolean) -> Unit
+525 |  0 | ) {
+526 |  1 |     Row(
+527 |  1 |         modifier = Modifier.fillMaxWidth(),
+528 |  1 |         verticalAlignment = Alignment.CenterVertically
+529 |  1 |     ) {
+530 |  2 |         Column(modifier = Modifier.weight(1f)) {
+531 |  3 |             Text(title, color = if (enabled) Color.White else Color.Gray, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+532 |  3 |             Text(subtitle, color = Color(0xFF8D98A3), fontSize = 12.sp, lineHeight = 18.sp)
+533 |  3 |         }
+534 |  2 |         Spacer(modifier = Modifier.size(12.dp))
+535 |  2 |         Switch(
+536 |  2 |             checked = checked,
+537 |  2 |             onCheckedChange = onCheckedChange,
+538 |  2 |             enabled = enabled,
+539 |  2 |             colors = SwitchDefaults.colors(
+540 |  2 |                 checkedThumbColor = Color.Black,
+541 |  2 |                 checkedTrackColor = Color(0xFF5ED1B6),
+542 |  2 |                 uncheckedThumbColor = Color.White,
+543 |  2 |                 uncheckedTrackColor = Color(0xFF3B4147)
+544 |  2 |             )
+545 |  2 |         )
+546 |  2 |     }
+547 |  1 | }
+549 |  0 | @Composable
+550 |  0 | private fun SocialPreviewCard(
+551 |  0 |     profile: SocialProfile,
+552 |  0 |     enabled: Boolean
+553 |  0 | ) {
+554 |  1 |     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+555 |  2 |         Row(verticalAlignment = Alignment.CenterVertically) {
+556 |  3 |             Box(
+557 |  3 |                 modifier = Modifier
+558 |  3 |                     .size(46.dp)
+559 |  3 |                     .background(Color(0xFFFFD54F).copy(alpha = 0.15f), CircleShape),
+560 |  3 |                 contentAlignment = Alignment.Center
+561 |  3 |             ) {
+562 |  4 |                 Text(profile.displayName.take(1).uppercase(), color = Color(0xFFFFD54F), fontWeight = FontWeight.Black)
+563 |  4 |             }
+564 |  3 |             Spacer(modifier = Modifier.size(12.dp))
+565 |  3 |             Column(modifier = Modifier.weight(1f)) {
+566 |  4 |                 Text(profile.displayName, color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp)
+567 |  4 |                 Text("Invite code: ${profile.inviteCode}", color = Color(0xFF9BA7B0), fontSize = 12.sp)
+568 |  4 |             }
+569 |  3 |             Surface(
+570 |  3 |                 color = if (enabled) Color(0xFF5ED1B6).copy(alpha = 0.16f) else Color.White.copy(alpha = 0.05f),
+571 |  3 |                 shape = RoundedCornerShape(999.dp)
+572 |  3 |             ) {
+573 |  4 |                 Text(
+574 |  4 |                     if (enabled) "LIVE" else "PRIVATE",
+575 |  4 |                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+576 |  4 |                     color = if (enabled) Color(0xFF5ED1B6) else Color.Gray,
+577 |  4 |                     fontWeight = FontWeight.Black,
+578 |  4 |                     fontSize = 10.sp
+579 |  4 |                 )
+580 |  4 |             }
+581 |  3 |         }
+583 |  2 |         Row(
+584 |  2 |             modifier = Modifier.fillMaxWidth(),
+585 |  2 |             horizontalArrangement = Arrangement.spacedBy(12.dp)
+586 |  2 |         ) {
+587 |  3 |             PreviewStat("STREAK", profile.streakBand ?: "Hidden", Color(0xFF5ED1B6), Modifier.weight(1f))
+588 |  3 |             PreviewStat("TREND", profile.consistencyTrend?.name?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Hidden", Color(0xFF7AC7FF), Modifier.weight(1f))
+589 |  3 |         }
+590 |  2 |         Row(
+591 |  2 |             modifier = Modifier.fillMaxWidth(),
+592 |  2 |             horizontalArrangement = Arrangement.spacedBy(12.dp)
+593 |  2 |         ) {
+594 |  3 |             PreviewStat("5 AM", profile.verifiedFiveAmThisWeek?.let { "$it/7" } ?: "Hidden", Color(0xFFFFD54F), Modifier.weight(1f))
+595 |  3 |             PreviewStat("ACTIVE", if (profile.activeThisWeek) "This week" else "Quiet", Color(0xFFFF8A65), Modifier.weight(1f))
+596 |  3 |         }
+598 |  2 |         Surface(
+599 |  2 |             color = Color.White.copy(alpha = 0.03f),
+600 |  2 |             shape = RoundedCornerShape(16.dp),
+601 |  2 |             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
+602 |  2 |             modifier = Modifier.fillMaxWidth()
+603 |  2 |         ) {
+604 |  3 |             Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+605 |  4 |                 Text("TITLES SHARED", color = Color(0xFF9BA7B0), fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+606 |  4 |                 Text(
+607 |  4 |                     profile.titles.takeIf { it.isNotEmpty() }?.joinToString("  ·  ") ?: "No titles visible right now",
+608 |  4 |                     color = Color.White,
+609 |  4 |                     fontSize = 13.sp,
+610 |  4 |                     lineHeight = 18.sp
+611 |  4 |                 )
+612 |  4 |             }
+613 |  3 |         }
+614 |  2 |     }
+615 |  1 | }
+617 |  0 | @Composable
+618 |  0 | private fun PreviewStat(
+619 |  0 |     label: String,
+620 |  0 |     value: String,
+621 |  0 |     accent: Color,
+622 |  0 |     modifier: Modifier = Modifier
+623 |  0 | ) {
+624 |  1 |     Surface(
+625 |  1 |         color = Color(0xFF121417),
+626 |  1 |         shape = RoundedCornerShape(16.dp),
+627 |  1 |         border = BorderStroke(1.dp, accent.copy(alpha = 0.18f)),
+628 |  1 |         modifier = modifier
+629 |  1 |     ) {
+630 |  2 |         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+631 |  3 |             Text(label, color = accent, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+632 |  3 |             Text(value, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+633 |  3 |         }
+634 |  2 |     }
+635 |  1 | }

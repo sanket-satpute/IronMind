@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "148721469101",
+    "project_id": "ironmind-9ce68",
+    "storage_bucket": "ironmind-9ce68.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:148721469101:android:0dea3ac3451cc17ae76824",
+        "android_client_info": {
+          "package_name": "com.sanket_satpute_20.ironmind"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "148721469101-eaa8sinnlklvd966ev822ig07sr1vp6s.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sanket_satpute_20.ironmind",
+            "certificate_hash": "4ef2d3c3d66539d107b77b7b542647af079f1885"
+          }
+        },
+        {
+          "client_id": "148721469101-d82107smquulq40e5449lfmr99ogb6ht.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyApJ46V7NiBYviMR5ACZbme_baTHdL-84w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "148721469101-d82107smquulq40e5449lfmr99ogb6ht.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">IronMind</string>
+    <string name="welcome_title">कोई बहाना नहीं। बस करो।</string>
+    <string name="onboarding_start">अनुशासन बनाना शुरू करें</string>
+    <string name="task_done">पूर्ण</string>
+    <string name="task_skip">छोड़ें</string>
+    <string name="streak">स्ट्रीक</string>
+    <string name="punishment_title">परिणाम भुगतें</string>
+    <string name="skip_sms_message">%1$s ने \"%2$s\" छोड़ दिया। उन्हें जवाबदेह ठहराएं।</string>
+    <string name="accessibility_description">IronMind को आपके फोकस सत्रों के दौरान ध्यान भटकाने वाले ऐप्स को ब्लॉक करने के लिए इस अनुमति की आवश्यकता है। ऐप के लिए आपके अपने नियमों को लागू करने के लिए यह आवश्यक है।</string>
+    <string name="punishment_notif_title">सजा चल रही है</string>
+    <string name="punishment_notif_text">आपका फ़ोन लॉक है। यह एक कार्य छोड़ने का परिणाम है।</string>
+    <string name="punishment_channel_name">सजा तालाबंदी</string>
+    <string name="punishment_channel_desc">सजा के दौरान आपका फ़ोन लॉक होने पर स्थायी सूचना दिखाता है।</string>
+</resources>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">IronMind</string>
+    <string name="welcome_title">कोणतेही कारण नाही. फक्त करा.</string>
+    <string name="onboarding_start">शिस्त लावणे सुरू करा</string>
+    <string name="task_done">पूर्ण</string>
+    <string name="task_skip">सोडा</string>
+    <string name="streak">स्ट्रीक</string>
+    <string name="punishment_title">परिणाम भोगा</string>
+    <string name="skip_sms_message">%1$s ने \"%2$s\" सोडले. त्यांना जबाबदार धरा.</string>
+    <string name="accessibility_description">IronMind ला तुमच्या फोकस सत्रादरम्यान विचलित करणारे अॅप्स ब्लॉक करण्यासाठी या परवानगीची आवश्यकता आहे. अॅपसाठी तुमचे स्वतःचे नियम लागू करण्यासाठी हे आवश्यक आहे.</string>
+    <string name="punishment_notif_title">शिक्षा सुरू आहे</string>
+    <string name="punishment_notif_text">तुमचा फोन लॉक केलेला आहे. हे कार्य वगळण्याचा परिणाम आहे.</string>
+    <string name="punishment_channel_name">शिक्षा लॉकडाउन</string>
+    <string name="punishment_channel_desc">तुमचा फोन शिक्षेदरम्यान लॉक केलेला असताना पर्सिस्टंट सूचना दाखवते.</string>
+</resources>

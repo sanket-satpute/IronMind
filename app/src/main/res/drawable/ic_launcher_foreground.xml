@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    IronMind App Icon — Exact VectorDrawable conversion
+    ════════════════════════════════════════════════════════════════
+    Source SVG: 480×480 viewBox
+    Viewport preserved at 480×480 so ALL coordinates are 1:1 exact.
+    No coordinate math, no scaling errors.
+
+    Source elements:
+      1. Background rect       — #080808 fill
+      2. Ring path             — linearGradient paint0_linear_16_18
+      3. Red dot (circle)      — #720000 + filter0_dii_16_18
+
+    Filter simulation (Android VD does not support SVG filter primitives):
+      The filter on the dot produces three effects:
+        effect1 — drop shadow offset(0,0) blur=1 black@25%
+                  → barely visible outer edge softening
+                  → simulated: radial gradient, darkening at perimeter
+        effect2 — inner shadow dy=+4 blur=3 #BC7B79@64%
+                  → warm pinkish glow at BOTTOM of sphere
+                  → simulated: linear gradient warm→transparent bottom→up
+        effect3 — inner shadow dy=-5 blur=2 #4A0C0B@100%
+                  → dark red shadow at TOP of sphere
+                  → simulated: linear gradient dark→transparent top→down
+      Together they create a 3-dimensional sphere lit from slightly below.
+
+    Gradient exact values:
+      Ring gradient (userSpaceOnUse, bottom→top):
+        x1=259 y1=409 → x2=247 y2=78.5
+        offset 0.000000 : #232328
+        offset 0.742498 : #2A2A30
+        offset 1.000000 : #6F6F79
+
+    Circle geometry:
+      cx=240 cy=115 r=25
+      Path: M 215,115 a 25,25 0 1,0 50,0 a 25,25 0 1,0 -50,0
+    ════════════════════════════════════════════════════════════════
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="480"
+    android:viewportHeight="480">
+
+    <!-- ══════════════════════════════════════════════════════════
+         LAYER 1 — BACKGROUND
+         Exact: <rect width="480" height="480" fill="#080808"/>
+         ══════════════════════════════════════════════════════════ -->
+    <path
+        android:pathData="M0,0 H480 V480 H0 Z"
+        android:fillColor="#080808"/>
+
+    <!-- ══════════════════════════════════════════════════════════
+         LAYER 2 — RING ARC
+         Exact path data copied verbatim from SVG.
+         Gradient: startX=259 startY=409 endX=247 endY=78.5
+         ══════════════════════════════════════════════════════════ -->
+    <path
+        android:pathData="M286.293,101.322C320.142,112.305 348.985,134.964 367.667,165.253C386.349,195.541 393.655,231.485 388.278,266.663C382.901,301.841 365.193,333.962 338.316,357.287C311.44,380.612 277.146,393.622 241.561,393.992C205.976,394.362 171.419,382.069 144.063,359.309C116.707,336.548 98.3334,304.803 92.2257,269.744C86.1181,234.686 92.6737,198.598 110.722,167.927C128.769,137.256 157.134,114.002 190.747,102.317L205.331,144.27C181.671,152.495 161.706,168.864 149.002,190.453C136.298,212.042 131.684,237.444 135.983,262.121C140.282,286.799 153.215,309.144 172.471,325.165C191.726,341.186 216.051,349.839 241.099,349.578C266.147,349.317 290.286,340.16 309.204,323.742C328.122,307.323 340.587,284.714 344.372,259.952C348.156,235.191 343.014,209.89 329.864,188.57C316.714,167.251 296.412,151.301 272.585,143.57L286.293,101.322Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="259"
+                android:startY="409"
+                android:endX="247"
+                android:endY="78.5">
+                <!-- stop-color="#232328" offset="0" -->
+                <item android:offset="0"        android:color="#FF232328"/>
+                <!-- stop-color="#2A2A30" offset="0.742498" -->
+                <item android:offset="0.742498" android:color="#FF2A2A30"/>
+                <!-- stop-color="#6F6F79" offset="1" -->
+                <item android:offset="1"        android:color="#FF6F6F79"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- ══════════════════════════════════════════════════════════
+         LAYER 3 — RED DOT BASE
+         Source: <circle cx="240" cy="115" r="25" fill="#720000"/>
+         Circle path: M 215,115 a 25,25 0 1,0 50,0 a 25,25 0 1,0 -50,0
+
+         Base fill is #720000. The radial gradient adds the subtle
+         edge darkening that simulates effect1 (drop shadow at 0,0).
+         Center is kept at #720000, outer edge darkens to #4A0000.
+         ══════════════════════════════════════════════════════════ -->
+    <path
+        android:pathData="M215,115 a25,25 0 1,0 50,0 a25,25 0 1,0 -50,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="240"
+                android:centerY="115"
+                android:gradientRadius="25">
+                <!-- Core: exact source color #720000 -->
+                <item android:offset="0.00" android:color="#FF720000"/>
+                <item android:offset="0.60" android:color="#FF720000"/>
+                <!-- Edge darkening: simulates outer drop shadow -->
+                <item android:offset="0.88" android:color="#FF5A0000"/>
+                <item android:offset="1.00" android:color="#FF3A0000"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- ══════════════════════════════════════════════════════════
+         LAYER 4 — DOT INNER SHADOW TOP (effect3)
+         Source filter: dy=-5, blur=2
+         Color from feColorMatrix:
+           R=0.292308×255=74   G=0.0454645×255=11   B=0.0427218×255=10
+           = #4A0B0A at alpha=1.0 = #FF4A0B0A
+         dy=-5 → shadow offset is -5 upward → dark area appears at TOP.
+         Linear gradient: dark at top (y=90) fading to transparent at center (y=115).
+         ══════════════════════════════════════════════════════════ -->
+    <path
+        android:pathData="M215,115 a25,25 0 1,0 50,0 a25,25 0 1,0 -50,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="240"
+                android:startY="90"
+                android:endX="240"
+                android:endY="117">
+                <!-- Top: full dark inner shadow color -->
+                <item android:offset="0.00" android:color="#FF4A0B0A"/>
+                <item android:offset="0.30" android:color="#CC4A0B0A"/>
+                <item android:offset="0.65" android:color="#554A0B0A"/>
+                <!-- Fades to transparent toward center -->
+                <item android:offset="1.00" android:color="#004A0B0A"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- ══════════════════════════════════════════════════════════
+         LAYER 5 — DOT INNER SHADOW BOTTOM (effect2)
+         Source filter: erode=1, dy=4, blur=3
+         Color from feColorMatrix:
+           R=0.737255×255=188   G=0.482353×255=123   B=0.47451×255=121
+           = #BC7B79 at alpha=0.64 → A = 0.64×255 = 163 = #A3
+         dy=+4 → shadow offset is +4 downward → warm area appears at BOTTOM.
+         Linear gradient: warm at bottom (y=140) fading to transparent at center.
+         ══════════════════════════════════════════════════════════ -->
+    <path
+        android:pathData="M215,115 a25,25 0 1,0 50,0 a25,25 0 1,0 -50,0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="240"
+                android:startY="140"
+                android:endX="240"
+                android:endY="113">
+                <!-- Bottom: full warm inner shadow — #A3BC7B79 -->
+                <item android:offset="0.00" android:color="#A3BC7B79"/>
+                <item android:offset="0.40" android:color="#70BC7B79"/>
+                <item android:offset="0.70" android:color="#30BC7B79"/>
+                <!-- Fades to transparent toward center -->
+                <item android:offset="1.00" android:color="#00BC7B79"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+</vector>

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg_dark">
+
+    <!-- Inner background for contrast -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:gravity="center"
+        android:background="#DD0A0C10">
+
+        <!-- Progress Ring container -->
+        <FrameLayout
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:layout_gravity="center">
+            
+            <!-- Outer border -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/widget_ring_bg" />
+
+            <!-- Progress value -->
+            <TextView
+                android:id="@+id/widget_integrity_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="100%"
+                android:textColor="#FFFFFF"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:shadowColor="#000000"
+                android:shadowDx="0"
+                android:shadowDy="2"
+                android:shadowRadius="4" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="INTEGRITY SHIELD"
+            android:textColor="#64B5F6"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:layout_marginTop="12dp"
+            android:letterSpacing="0.1" />
+
+        <TextView
+            android:id="@+id/widget_mode_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="BUILD MODE"
+            android:textColor="#B0BEC5"
+            android:textSize="12sp"
+            android:layout_marginTop="2dp" />
+
+    </LinearLayout>
+</FrameLayout>

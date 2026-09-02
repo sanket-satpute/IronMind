@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    IronMind Background Layer — #080808
+    Exact match to SVG: <rect width="480" height="480" fill="#080808"/>
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="480"
+    android:viewportHeight="480">
+
+    <path
+        android:pathData="M0,0 H480 V480 H0 Z"
+        android:fillColor="#080808"/>
+
+</vector>

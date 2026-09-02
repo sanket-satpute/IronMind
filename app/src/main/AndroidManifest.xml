@@ -1,0 +1,387 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-feature
+        android:name="android.hardware.telephony"
+        android:required="false" />
+
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY"/>
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions"
+        tools:node="replace" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+    
+    <uses-permission android:name="android.permission.SEND_SMS"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28"
+        tools:replace="android:maxSdkVersion"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.READ_CONTACTS"/>
+    
+    <!-- Required to see other apps on Android 11+ -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+
+    <!-- Health Connect Permissions -->
+    <uses-permission android:name="android.permission.health.READ_SLEEP" />
+
+    <!-- Context Intelligence Permissions -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="com.google.android.gms.permission.ACTIVITY_RECOGNITION" />
+
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <!-- For Health Connect installation check -->
+        <package android:name="com.google.android.apps.healthdata" />
+    </queries>
+
+    <application
+        android:name=".IronMindApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.IronMind">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.IronMind.Splash">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".punishment.PunishmentActivity"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:exported="false" />
+
+        <activity
+            android:name=".onboarding.FocusBreachActivity"
+            android:theme="@style/Theme.IronMind.LockScreen"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:exported="false"/>
+
+        <activity
+            android:name=".onboarding.NudgeActivity"
+            android:theme="@style/Theme.IronMind.LockScreen"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:exported="false"/>
+
+        <activity
+            android:name=".focus.BlackHoleActivity"
+            android:theme="@style/Theme.Transparent"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:exported="false"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"/>
+
+        <!-- THE WORK START DESK -->
+        <activity
+            android:name=".focus.WorkStartActivity"
+            android:theme="@style/Theme.IronMind.LockScreen"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:exported="false"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"/>
+
+        <activity
+            android:name=".focus.PomodoroSetupActivity"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:exported="false"/>
+
+        <activity
+            android:name=".focus.PomodoroChamberActivity"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:exported="false"/>
+
+        <activity
+            android:name=".focus.WorkLockActivity"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:lockTaskMode="if_whitelisted"
+            android:exported="false"/>
+
+        <activity
+            android:name=".focus.PomodoroSummaryActivity"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:exported="false"/>
+
+        <activity
+            android:name=".focus.BedtimeReaperActivity"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:exported="false"/>
+
+        <activity
+            android:name=".sleeplock.SleepLockActivity"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:exported="false"/>
+
+        <activity
+            android:name=".sleeplock.BedtimeIncomingActivity"
+            android:theme="@style/Theme.IronMind.LockScreen"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:exported="false"/>
+
+        <activity
+            android:name=".morninglaunch.MorningLaunchActivity"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:exported="false"/>
+
+        <activity
+            android:name=".confidence.ConfidenceIgnitionActivity"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:exported="false"/>
+
+        <activity
+            android:name=".artifact.ArtifactUnlockActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"/>
+
+        <activity
+            android:name=".morninglaunch.MorningUnlockReviewActivity"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:exported="false"/>
+
+        <activity
+            android:name=".morninglaunch.MorningDayBoardActivity"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:exported="false"/>
+
+        <activity
+            android:name=".nightdecision.NightDecisionActivity"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:exported="false"/>
+
+        <receiver android:name=".alarm.AlarmReceiver"
+            android:exported="false"/>
+
+        <receiver android:name=".alarm.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".focus.SpringDeviceAdminReceiver"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/spring_device_admin_receiver" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver android:name=".detox.DetoxReceiver" android:exported="false"/>
+        <receiver android:name=".sleeplock.SleepLockAlarmReceiver" android:exported="false"/>
+        <receiver android:name=".nightdecision.NightDecisionAlarmReceiver" android:exported="false"/>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths"/>
+        </provider>
+
+        <service
+            android:name=".blocker.IronMindAccessibilityService"
+            android:exported="true"
+            android:label="IronMind Focus Guard"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config"/>
+        </service>
+
+        <service
+            android:name=".punishment.PunishmentForegroundService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false"/>
+
+        <service
+            android:name=".focus.FocusSessionService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false"/>
+
+        <service
+            android:name=".sleeplock.SleepLockSoundService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="false"/>
+
+        <!-- Zero-Setup Contextual Discipline Service -->
+        <service
+            android:name=".context.ContextIntelligenceService"
+            android:foregroundServiceType="location"
+            android:exported="false" />
+
+        <receiver android:name=".challenge.ChallengeAlarmReceiver"
+            android:exported="false"/>
+
+        <activity
+            android:name=".challenge.ChallengeAlarmActivity"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:exported="false"/>
+
+        <receiver
+            android:name=".widget.ZenithWidgetReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/zenith_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".integrity.IntegrityShieldWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.ironmind.ACTION_UPDATE_SHIELD_WIDGET" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info" />
+        </receiver>
+
+        <activity
+            android:name=".integrity.NeutralBlockActivity"
+            android:theme="@style/Theme.IronMind.LockScreen"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:exported="false"/>
+
+        <service
+            android:name=".integrity.ShieldMonitorService"
+            android:foregroundServiceType="specialUse"
+            android:exported="false">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Ongoing self-control and focus state monitoring" />
+        </service>
+
+        <activity
+            android:name=".crucible.CrucibleFailActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"/>
+
+        <!-- Required for Health Connect integration -->
+        <activity
+            android:name=".health.HealthPermissionActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"/>
+            </intent-filter>
+        </activity>
+
+        <!-- For versions starting Android 14, create an activity alias to show the rationale
+             of Health Connect permissions once users click the privacy policy link. -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".health.HealthPermissionActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
+    </application>
+
+</manifest>
