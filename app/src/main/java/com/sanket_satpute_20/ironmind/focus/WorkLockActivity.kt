@@ -82,7 +82,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sanket_satpute_20.ironmind.data.IronMindDatabase
 import com.sanket_satpute_20.ironmind.data.PrefManager
+import android.util.Log
 import com.sanket_satpute_20.ironmind.data.TaskEvent
+import com.sanket_satpute_20.ironmind.failure.FailureEvidenceFactory
+import com.sanket_satpute_20.ironmind.failure.FailureService
+import com.sanket_satpute_20.ironmind.focus.EarnedUnlockManager
+import com.sanket_satpute_20.ironmind.focus.FocusSessionService
 import com.sanket_satpute_20.ironmind.mission.MissionExecutionResult
 import com.sanket_satpute_20.ironmind.mission.MissionExecutionService
 import com.sanket_satpute_20.ironmind.ui.theme.IronMindTheme
@@ -1455,6 +1460,19 @@ private fun emergencyExit(context: Context, manager: WorkLockManager) {
                         summary = pomodoroSummary,
                         timestamp = System.currentTimeMillis()
                     )
+                }
+                
+                runCatching {
+                    val failureService = FailureService.create(context)
+                    val evidence = FailureEvidenceFactory.emergencyExit(
+                        task = task,
+                        timestamp = System.currentTimeMillis(),
+                        reason = "SPRING_PROTOCOL_EMERGENCY_EXIT",
+                        pomodoroSummary = pomodoroSummary
+                    )
+                    failureService.recordFailure(evidence)
+                }.onFailure {
+                    Log.e("WorkLockActivity", "Failed to record emergency exit failure", it)
                 }
         }
         FocusSessionService.stop(context)

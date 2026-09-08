@@ -9,6 +9,10 @@ import com.sanket_satpute_20.ironmind.data.IronMindDatabase
 import com.sanket_satpute_20.ironmind.data.PrefManager
 import com.sanket_satpute_20.ironmind.data.Task
 import com.sanket_satpute_20.ironmind.data.TaskEvent
+import com.sanket_satpute_20.ironmind.failure.FailureEvidence
+import com.sanket_satpute_20.ironmind.failure.FailureEvidenceFactory
+import com.sanket_satpute_20.ironmind.failure.FailureService
+import com.sanket_satpute_20.ironmind.failure.MissionFailureContext
 import com.sanket_satpute_20.ironmind.focus.EarnedUnlockManager
 import com.sanket_satpute_20.ironmind.focus.FocusSessionService
 import com.sanket_satpute_20.ironmind.focus.PomodoroEngine
@@ -94,6 +98,7 @@ class MissionExecutionService(context: Context) {
     private val pomodoroEngine = PomodoroEngine(appContext)
     private val runtimePolicyController = RuntimePolicyController(appContext)
     private val earnedUnlockManager = EarnedUnlockManager(appContext)
+    private val failureService = FailureService.create(appContext)
 
     suspend fun startMission(
         taskId: Int,
@@ -297,7 +302,8 @@ class MissionExecutionService(context: Context) {
     suspend fun skipMission(
         taskId: Int,
         skipReason: String,
-        eventReason: String = skipReason
+        eventReason: String = skipReason,
+        failureContext: MissionFailureContext = MissionFailureContext.USER_SKIP
     ): MissionExecutionResult = mutex.withLock {
         runCatching {
             val task = db.taskDao().getTaskById(taskId) ?: return@withLock MissionExecutionResult.MissingTask(taskId)
@@ -343,6 +349,38 @@ class MissionExecutionService(context: Context) {
                 Log.e(TAG, "skipMission cleanup failed for task $taskId", it)
                 null
             }
+
+            val failureEvidence = when (failureContext) {
+                MissionFailureContext.USER_SKIP ->
+                    FailureEvidenceFactory.userSkipped(
+                        task = updatedTask,
+                        timestamp = now,
+                        reason = skipReason,
+                        protectionWasActive = task.isInProgress
+                    )
+                MissionFailureContext.WORK_LOCK_BREAK ->
+                    FailureEvidenceFactory.workLockBroken(
+                        task = updatedTask,
+                        timestamp = now,
+                        reason = skipReason,
+                        pomodoroSummary = pomodoroSummary
+                    )
+                MissionFailureContext.POMODORO_BREAK ->
+                    FailureEvidenceFactory.pomodoroBroken(
+                        task = updatedTask,
+                        timestamp = now,
+                        reason = skipReason,
+                        pomodoroSummary = pomodoroSummary
+                    )
+                MissionFailureContext.EMERGENCY_EXIT ->
+                    FailureEvidenceFactory.emergencyExit(
+                        task = updatedTask,
+                        timestamp = now,
+                        reason = skipReason,
+                        pomodoroSummary = pomodoroSummary
+                    )
+            }
+            recordFailureSafely(failureEvidence)
 
             MissionExecutionResult.Skipped(updatedTask, now, pomodoroSummary)
         }.getOrElse { MissionExecutionResult.Failed("skipMission failed", it) }
@@ -402,6 +440,21 @@ class MissionExecutionService(context: Context) {
 
             MissionExecutionResult.Deferred(updatedTask, now)
         }.getOrElse { MissionExecutionResult.Failed("deferMission failed", it) }
+    }
+
+    private fun recordFailureSafely(evidence: FailureEvidence) {
+        runCatching {
+            failureService.recordFailure(
+                evidence = evidence
+            )
+        }.onFailure {
+            Log.e(
+                TAG,
+                "Failed to record mission failure " +
+                        "${evidence.failureType} for task ${evidence.taskId}",
+                it
+            )
+        }
     }
 
     private fun isWorkLockOwnedBy(taskId: Int): Boolean =
