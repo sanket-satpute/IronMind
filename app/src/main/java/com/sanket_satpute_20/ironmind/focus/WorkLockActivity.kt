@@ -80,10 +80,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.sanket_satpute_20.ironmind.alarm.AlarmScheduler
 import com.sanket_satpute_20.ironmind.data.IronMindDatabase
 import com.sanket_satpute_20.ironmind.data.PrefManager
 import com.sanket_satpute_20.ironmind.data.TaskEvent
+import com.sanket_satpute_20.ironmind.mission.MissionExecutionResult
+import com.sanket_satpute_20.ironmind.mission.MissionExecutionService
 import com.sanket_satpute_20.ironmind.ui.theme.IronMindTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -1393,33 +1394,12 @@ private fun completeCurrentMission(context: Context, manager: WorkLockManager) {
         val earnedUnlockManager = EarnedUnlockManager(context)
         val db = IronMindDatabase.getDatabase(context)
         val task = resolveCurrentLiveTask(db, prefs) ?: return@launch
-        db.taskDao().updateTask(
-            task.copy(
-                isCompleted = true,
-                isDeferred = false,
-                isInProgress = false,
-                completedAt = now,
-                completionSource = "WORK_LOCK",
-                lastModified = now,
-                syncStatus = "PENDING"
-            )
+        val missionResult = MissionExecutionService(context).completeMission(
+            taskId = task.id,
+            completionSource = "WORK_LOCK",
+            eventReason = "WORK_LOCK_COMPLETE"
         )
-        AlarmScheduler.cancelTaskAlarms(context, task.id, task.name)
-        db.taskEventDao().insert(
-            TaskEvent(
-                taskId = task.id,
-                taskName = task.name,
-                date = task.date,
-                eventType = "COMPLETED",
-                timestamp = now,
-                oldStartTime = task.startTime,
-                oldEndTime = task.endTime,
-                newStartTime = task.startTime,
-                newEndTime = task.endTime,
-                focusScoreSnapshot = task.focusScore,
-                reason = "WORK_LOCK_COMPLETE"
-            )
-        )
+        if (missionResult !is MissionExecutionResult.Completed) return@launch
         db.taskEventDao().insert(
             TaskEvent(
                 taskId = task.id,
@@ -1480,33 +1460,12 @@ private fun breakCurrentMission(context: Context, manager: WorkLockManager) {
         val db = IronMindDatabase.getDatabase(context)
         val task = resolveCurrentLiveTask(db, prefs)
         if (task != null) {
-                db.taskDao().updateTask(
-                    task.copy(
-                        isSkipped = true,
-                        isDeferred = false,
-                        isInProgress = false,
-                        skippedAt = now,
-                        skipReason = "WORK_LOCK_BREAK",
-                        lastModified = now,
-                        syncStatus = "PENDING"
-                    )
+                val missionResult = MissionExecutionService(context).skipMission(
+                    taskId = task.id,
+                    skipReason = "WORK_LOCK_BREAK",
+                    eventReason = "WORK_LOCK_BREAK"
                 )
-                AlarmScheduler.cancelTaskAlarms(context, task.id, task.name)
-                db.taskEventDao().insert(
-                    TaskEvent(
-                        taskId = task.id,
-                        taskName = task.name,
-                        date = task.date,
-                        eventType = "SKIPPED",
-                        timestamp = now,
-                        oldStartTime = task.startTime,
-                        oldEndTime = task.endTime,
-                        newStartTime = task.startTime,
-                        newEndTime = task.endTime,
-                        focusScoreSnapshot = task.focusScore,
-                        reason = "WORK_LOCK_BREAK"
-                    )
-                )
+                if (missionResult !is MissionExecutionResult.Skipped) return@launch
                 db.taskEventDao().insert(
                     TaskEvent(
                         taskId = task.id,

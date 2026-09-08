@@ -16,7 +16,6 @@ import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.sanket_satpute_20.ironmind.accountability.AccountabilityManager
-import com.sanket_satpute_20.ironmind.alarm.AlarmScheduler
 import com.sanket_satpute_20.ironmind.data.*
 import com.sanket_satpute_20.ironmind.psychology.*
 import com.sanket_satpute_20.ironmind.widget.ZenithWidget
@@ -26,6 +25,8 @@ import com.sanket_satpute_20.ironmind.bossmode.BossModeAnalyzer
 import com.sanket_satpute_20.ironmind.bossmode.BossModeUpgrade
 import com.sanket_satpute_20.ironmind.focus.EarnedUnlockManager
 import com.sanket_satpute_20.ironmind.focus.FocusSessionService
+import com.sanket_satpute_20.ironmind.mission.MissionExecutionResult
+import com.sanket_satpute_20.ironmind.mission.MissionExecutionService
 import com.sanket_satpute_20.ironmind.share.MilestoneDetector
 import com.sanket_satpute_20.ironmind.social.FirebaseSocialRepository
 import com.sanket_satpute_20.ironmind.social.SocialOverview
@@ -104,6 +105,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     val prefManager: PrefManager = PrefManager.getInstance(application)
     private val crucibleManager = CrucibleManager(prefManager)
     private val earnedUnlockManager = EarnedUnlockManager(application)
+    private val missionExecutionService = MissionExecutionService(application)
 
     // Reactive states
     private val _userSnapshot = MutableStateFlow<UserSnapshot?>(auth.currentUser?.toSnapshot())
@@ -482,47 +484,26 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         }
         if (pendingTasks.isEmpty()) return
 
-        val now = System.currentTimeMillis()
         val updatedTasks = pendingTasks.map { task ->
-            val updatedTask = if (completed) {
-                task.copy(
-                    isCompleted = true,
-                    isDeferred = false,
-                    isInProgress = false,
-                    completedAt = now,
+            val missionResult = if (completed) {
+                missionExecutionService.completeMission(
+                    taskId = task.id,
                     completionSource = "HOME_MANUAL",
-                    lastModified = now,
-                    syncStatus = "PENDING"
+                    eventReason = reason
                 )
             } else {
-                task.copy(
-                    isSkipped = true,
-                    isDeferred = false,
-                    isInProgress = false,
-                    skippedAt = now,
+                missionExecutionService.skipMission(
+                    taskId = task.id,
                     skipReason = normalizeSkipReason(reason, task),
-                    lastModified = now,
-                    syncStatus = "PENDING"
+                    eventReason = reason
                 )
             }
+            val updatedTask = when (missionResult) {
+                is MissionExecutionResult.Completed -> missionResult.task
+                is MissionExecutionResult.Skipped -> missionResult.task
+                else -> task
+            }
 
-            taskDao.updateTask(updatedTask)
-            AlarmScheduler.cancelTaskAlarms(getApplication(), task.id, task.name)
-            taskEventDao.insert(
-                TaskEvent(
-                    taskId = updatedTask.id,
-                    taskName = updatedTask.name,
-                    date = updatedTask.date,
-                    eventType = if (completed) "COMPLETED" else "SKIPPED",
-                    timestamp = now,
-                    oldStartTime = task.startTime,
-                    oldEndTime = task.endTime,
-                    newStartTime = updatedTask.startTime,
-                    newEndTime = updatedTask.endTime,
-                    focusScoreSnapshot = updatedTask.focusScore,
-                    reason = reason
-                )
-            )
             completeFocusSessionForTask(
                 updatedTask,
                 result = if (completed) "COMPLETED" else "SKIPPED",

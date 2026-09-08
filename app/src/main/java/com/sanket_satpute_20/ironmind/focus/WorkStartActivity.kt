@@ -40,13 +40,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sanket_satpute_20.ironmind.alarm.AlarmReceiver
-import com.sanket_satpute_20.ironmind.alarm.AlarmScheduler
 import com.sanket_satpute_20.ironmind.apps.AppClassificationRepository
 import com.sanket_satpute_20.ironmind.apps.ClassifiedApp
-import com.sanket_satpute_20.ironmind.data.FocusSession
 import com.sanket_satpute_20.ironmind.data.IronMindDatabase
 import com.sanket_satpute_20.ironmind.data.PrefManager
-import com.sanket_satpute_20.ironmind.data.TaskEvent
+import com.sanket_satpute_20.ironmind.mission.MissionExecutionResult
+import com.sanket_satpute_20.ironmind.mission.MissionExecutionService
 import com.sanket_satpute_20.ironmind.psychology.AdaptiveEngine
 import com.sanket_satpute_20.ironmind.psychology.IdentityLevelEngine
 import com.sanket_satpute_20.ironmind.ui.components.AppIconImage
@@ -54,13 +53,6 @@ import com.sanket_satpute_20.ironmind.ui.theme.IronMindTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.time.Duration
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.LocalDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import com.sanket_satpute_20.ironmind.ui.theme.DeepBackground
 import com.sanket_satpute_20.ironmind.ui.theme.SurfaceDark
 import com.sanket_satpute_20.ironmind.ui.theme.SurfaceElevated
@@ -184,242 +176,93 @@ class WorkStartActivity : ComponentActivity() {
 
     private fun startFocusSession(taskId: Int, taskName: String, selectedContextApps: Set<String>) {
         com.sanket_satpute_20.ironmind.gamification.HapticsManager.getInstance(this).playSuccess(); com.sanket_satpute_20.ironmind.gamification.SoundManager.getInstance(this).playTaskComplete()
+        if (taskId == -1) return
         val prefs = PrefManager.getInstance(this)
-        val workLockManager = WorkLockManager(this)
-        val pomodoroEngine = PomodoroEngine(this)
-        prefs.activeMissionContextApps = selectedContextApps
-        sendBroadcast(Intent("com.ironmind.RELOAD_GUARD").apply { setPackage(packageName) })
-        if (taskId != -1) {
-            FocusSessionService.start(this, taskName)
-            CoroutineScope(Dispatchers.IO).launch {
-                val db = IronMindDatabase.getDatabase(applicationContext)
-                db.taskDao().getTaskById(taskId)?.let { task ->
-                    val now = System.currentTimeMillis()
-                    val taskEndAt = resolveTaskEndMillis(task.date, task.endTime)
-                    if (taskEndAt == null || taskEndAt <= now) {
-                        launch(Dispatchers.Main) {
-                            Toast.makeText(
-                                this@WorkStartActivity,
-                                "This task window has already ended. Reschedule it before starting.",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
-                        return@let
-                    }
-                    prefs.activeTaskName = task.name
-                    prefs.activeTaskStartTime = task.startTime
-                    prefs.activeTaskEndTime = task.endTime
-                    prefs.activeTaskDate = task.date
-                    db.taskDao().updateTask(
-                        task.copy(
-                            isDeferred = false,
-                            isInProgress = true,
-                            startedAt = task.startedAt ?: now,
-                            lastModified = now,
-                            syncStatus = "PENDING"
-                        )
-                    )
-                    db.taskEventDao().insert(
-                        TaskEvent(
-                            taskId = task.id,
-                            taskName = task.name,
-                            date = task.date,
-                            eventType = "STARTED",
-                            timestamp = now,
-                            newStartTime = task.startTime,
-                            newEndTime = task.endTime,
-                            focusScoreSnapshot = task.focusScore,
-                            reason = "MISSION_BRIEFING_START"
-                        )
-                    )
-                    db.focusSessionDao().insert(
-                        FocusSession(
-                            taskId = task.id,
-                            taskName = task.name,
-                            date = task.date,
-                            startTimestamp = now,
-                            plannedDurationMinutes = plannedDurationMinutes(task.startTime, task.endTime)
-                        )
-                    )
-                    val armed = workLockManager.startForTask(
-                        taskId = task.id,
-                        taskName = task.name,
-                        taskDate = task.date,
-                        taskEndTime = task.endTime
-                    )
-                    val pomodoroStarted = pomodoroEngine.startForTask(task)
-                    if (armed) {
-                        db.taskEventDao().insert(
-                            TaskEvent(
-                                taskId = task.id,
-                                taskName = task.name,
-                                date = task.date,
-                                eventType = "WORK_LOCK_STARTED",
-                                timestamp = now,
-                                oldStartTime = task.startTime,
-                                oldEndTime = task.endTime,
-                                newStartTime = task.startTime,
-                                newEndTime = task.endTime,
-                                focusScoreSnapshot = task.focusScore,
-                                reason = "SPRING_PROTOCOL_ARMED"
-                            )
-                        )
-                    }
-                    if (pomodoroStarted) {
-                        db.taskEventDao().insert(
-                            TaskEvent(
-                                taskId = task.id,
-                                taskName = task.name,
-                                date = task.date,
-                                eventType = "POMODORO_STARTED",
-                                timestamp = now,
-                                oldStartTime = task.startTime,
-                                oldEndTime = task.endTime,
-                                newStartTime = task.startTime,
-                                newEndTime = task.endTime,
-                                focusScoreSnapshot = task.focusScore,
-                                reason = "MISSION_BRIEFING_START"
-                            )
-                        )
-                    }
+        val missionExecutionService = MissionExecutionService(this)
+        CoroutineScope(Dispatchers.IO).launch {
+            when (val result = missionExecutionService.startMission(taskId = taskId, allowedPackages = selectedContextApps)) {
+                is MissionExecutionResult.Started -> {
+                    prefs.totalXp += 10
                     launch(Dispatchers.Main) {
                         startActivity(
                             WorkLockActivity.createIntent(
                                 context = this@WorkStartActivity,
-                                taskId = task.id,
-                                taskName = task.name,
-                                taskDate = task.date,
-                                taskStartTime = task.startTime,
-                                taskEndTime = task.endTime
+                                taskId = result.task.id,
+                                taskName = result.task.name,
+                                taskDate = result.task.date,
+                                taskStartTime = result.task.startTime,
+                                taskEndTime = result.task.endTime
                             )
                         )
                     }
                 }
+                is MissionExecutionResult.AlreadyActive -> {
+                    launch(Dispatchers.Main) {
+                        startActivity(
+                            WorkLockActivity.createIntent(
+                                context = this@WorkStartActivity,
+                                taskId = result.task.id,
+                                taskName = result.task.name,
+                                taskDate = result.task.date,
+                                taskStartTime = result.task.startTime,
+                                taskEndTime = result.task.endTime
+                            )
+                        )
+                    }
+                }
+                is MissionExecutionResult.InvalidWindow -> {
+                    launch(Dispatchers.Main) {
+                        Toast.makeText(this@WorkStartActivity, result.reason, Toast.LENGTH_LONG).show()
+                    }
+                }
+                else -> {
+                    launch(Dispatchers.Main) {
+                        Toast.makeText(this@WorkStartActivity, "Unable to start this mission.", Toast.LENGTH_LONG).show()
+                    }
+                }
             }
-            prefs.totalXp += 10
         }
     }
 
     private fun deferTask(taskId: Int) {
-        if (taskId != -1) {
-            val prefs = PrefManager.getInstance(this)
-            prefs.clearActiveMissionContextApps()
-            prefs.clearWorkLock()
-            prefs.clearPomodoro()
-            sendBroadcast(Intent("com.ironmind.RELOAD_GUARD").apply { setPackage(packageName) })
-            com.sanket_satpute_20.ironmind.gamification.GamificationEngine.getInstance(this).penalizeXp(5L)
-            CoroutineScope(Dispatchers.IO).launch {
-                val db = IronMindDatabase.getDatabase(applicationContext)
-                db.taskDao().getTaskById(taskId)?.let { task ->
-                    val now = System.currentTimeMillis()
-                    val deferredTask = task.copy(
-                        isDeferred = true,
-                        isInProgress = false,
-                        deferredAt = now,
-                        lastModified = now,
-                        syncStatus = "PENDING"
-                    )
-                    db.taskDao().updateTask(deferredTask)
-                    AlarmScheduler.cancelTaskAlarms(applicationContext, task.id, task.name)
-                    db.taskEventDao().insert(
-                        TaskEvent(
-                            taskId = deferredTask.id,
-                            taskName = deferredTask.name,
-                            date = deferredTask.date,
-                            eventType = "DEFERRED",
-                            timestamp = now,
-                            oldStartTime = task.startTime,
-                            oldEndTime = task.endTime,
-                            newStartTime = deferredTask.startTime,
-                            newEndTime = deferredTask.endTime,
-                            reason = "MISSION_BRIEFING_DEFER"
-                        )
-                    )
-                    AlarmScheduler.scheduleTaskAlarms(applicationContext, deferredTask) 
-                }
-            }
+        if (taskId == -1) return
+        val prefs = PrefManager.getInstance(this)
+        prefs.clearActiveMissionContextApps()
+        prefs.clearWorkLock()
+        prefs.clearPomodoro()
+        sendBroadcast(Intent("com.ironmind.RELOAD_GUARD").apply { setPackage(packageName) })
+        com.sanket_satpute_20.ironmind.gamification.GamificationEngine.getInstance(this).penalizeXp(5L)
+        val missionExecutionService = MissionExecutionService(this)
+        CoroutineScope(Dispatchers.IO).launch {
+            missionExecutionService.deferMission(taskId = taskId, reason = "MISSION_BRIEFING_DEFER")
         }
     }
 
     private fun abortTask(taskId: Int): Boolean {
         var shieldShattered = false
-        if (taskId != -1) {
-            com.sanket_satpute_20.ironmind.gamification.HapticsManager.getInstance(this).playError(); com.sanket_satpute_20.ironmind.gamification.SoundManager.getInstance(this).playTemptationBlocked()
-            val prefs = PrefManager.getInstance(this)
-            prefs.clearActiveMissionContextApps()
-            prefs.clearWorkLock()
-            prefs.clearPomodoro()
-            sendBroadcast(Intent("com.ironmind.RELOAD_GUARD").apply { setPackage(packageName) })
-            com.sanket_satpute_20.ironmind.gamification.GamificationEngine.getInstance(this).penalizeXp(25L)
-            if (prefs.streakShields > 0) {
-                prefs.streakShields = prefs.streakShields - 1
-                shieldShattered = true
-            } else if (prefs.isStreakInCriticalState) {
-                com.sanket_satpute_20.ironmind.gamification.GamificationEngine.getInstance(this).resetStreak()
-                prefs.isStreakInCriticalState = false
-            } else {
-                prefs.isStreakInCriticalState = true
-                prefs.streakCriticalTimestamp = System.currentTimeMillis()
-            }
-            CoroutineScope(Dispatchers.IO).launch {
-                val db = IronMindDatabase.getDatabase(applicationContext)
-                db.taskDao().getTaskById(taskId)?.let { task ->
-                    val now = System.currentTimeMillis()
-                    db.taskDao().updateTask(
-                        task.copy(
-                            isSkipped = true,
-                            isDeferred = false,
-                            isInProgress = false,
-                            skippedAt = now,
-                            skipReason = "MISSION_ABORT",
-                            lastModified = now,
-                            syncStatus = "PENDING"
-                        )
-                    )
-                    AlarmScheduler.cancelTaskAlarms(applicationContext, task.id, task.name)
-                    db.taskEventDao().insert(
-                        TaskEvent(
-                            taskId = task.id,
-                            taskName = task.name,
-                            date = task.date,
-                            eventType = "SKIPPED",
-                            timestamp = now,
-                            oldStartTime = task.startTime,
-                            oldEndTime = task.endTime,
-                            newStartTime = task.startTime,
-                            newEndTime = task.endTime,
-                            reason = "MISSION_ABORT"
-                        )
-                    )
-                }
-            }
+        if (taskId == -1) return shieldShattered
+        com.sanket_satpute_20.ironmind.gamification.HapticsManager.getInstance(this).playError(); com.sanket_satpute_20.ironmind.gamification.SoundManager.getInstance(this).playTemptationBlocked()
+        val prefs = PrefManager.getInstance(this)
+        prefs.clearActiveMissionContextApps()
+        prefs.clearWorkLock()
+        prefs.clearPomodoro()
+        sendBroadcast(Intent("com.ironmind.RELOAD_GUARD").apply { setPackage(packageName) })
+        com.sanket_satpute_20.ironmind.gamification.GamificationEngine.getInstance(this).penalizeXp(25L)
+        if (prefs.streakShields > 0) {
+            prefs.streakShields = prefs.streakShields - 1
+            shieldShattered = true
+        } else if (prefs.isStreakInCriticalState) {
+            com.sanket_satpute_20.ironmind.gamification.GamificationEngine.getInstance(this).resetStreak()
+            prefs.isStreakInCriticalState = false
+        } else {
+            prefs.isStreakInCriticalState = true
+            prefs.streakCriticalTimestamp = System.currentTimeMillis()
+        }
+        val missionExecutionService = MissionExecutionService(this)
+        CoroutineScope(Dispatchers.IO).launch {
+            missionExecutionService.skipMission(taskId = taskId, skipReason = "MISSION_ABORT")
         }
         return shieldShattered
-    }
-
-    private fun plannedDurationMinutes(startTime: String, endTime: String): Int {
-        val start = parseTime(startTime) ?: return 0
-        val end = parseTime(endTime) ?: return 0
-        return Duration.between(start, end).toMinutes().coerceAtLeast(0).toInt()
-    }
-
-    private fun resolveTaskEndMillis(taskDate: String, taskEndTime: String): Long? {
-        val date = runCatching { LocalDate.parse(taskDate) }.getOrNull() ?: return null
-        val end = parseTime(taskEndTime) ?: return null
-        return LocalDateTime.of(date, end)
-            .atZone(ZoneId.systemDefault())
-            .toInstant()
-            .toEpochMilli()
-    }
-
-    private fun parseTime(timeStr: String): LocalTime? {
-        val formats = listOf("HH:mm", "H:mm", "hh:mm a", "h:mm a")
-        for (format in formats) {
-            runCatching {
-                return LocalTime.parse(timeStr.uppercase(), DateTimeFormatter.ofPattern(format, Locale.US))
-            }
-        }
-        return null
     }
 
     companion object {
