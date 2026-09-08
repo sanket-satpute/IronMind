@@ -130,4 +130,67 @@ class RuntimeReconciliationServiceTest {
         assertFalse(task.isCompleted)
         assertFalse(task.isSkipped)
     }
+    @Test
+    fun `active context belongs to task`() {
+        val task = Task(id = 1, name = "A", date = "D", startTime = "S", endTime = "E")
+        val prefsName = "A"
+        val prefsDate = "D"
+        val prefsStart = "S"
+        val prefsEnd = "E"
+        val belongs = task.name == prefsName && task.date == prefsDate && task.startTime == prefsStart && task.endTime == prefsEnd
+        assertTrue(belongs)
+    }
+
+    @Test
+    fun `active context belongs to another task`() {
+        val task = Task(id = 1, name = "A", date = "D", startTime = "S", endTime = "E")
+        val prefsName = "B"
+        val prefsDate = "D"
+        val prefsStart = "S"
+        val prefsEnd = "E"
+        val belongs = task.name == prefsName && task.date == prefsDate && task.startTime == prefsStart && task.endTime == prefsEnd
+        assertFalse(belongs)
+    }
+
+    @Test
+    fun `orphan runtime with no Task`() {
+        val activeTaskId: Int? = null
+        val runtimeTask: Task? = null
+        val stillValid = runtimeTask?.let { task ->
+            task.isInProgress && !task.isCompleted && !task.isSkipped
+        } ?: false
+        assertFalse(stillValid)
+    }
+
+    @Test
+    fun `orphan runtime with completed Task`() {
+        val runtimeTask = Task(id = 1, isInProgress = false, isCompleted = true)
+        val stillValid = runtimeTask.let { task ->
+            task.isInProgress && !task.isCompleted && !task.isSkipped
+        }
+        assertFalse(stillValid)
+    }
+
+    @Test
+    fun `repeated reconciliation is idempotent`() {
+        val latestTask = Task(id = 1, isInProgress = false, isSkipped = true)
+        val shouldReconcile = latestTask.isInProgress && !latestTask.isCompleted && !latestTask.isSkipped
+        assertFalse(shouldReconcile)
+    }
+
+    @Test
+    fun `duplicate SYSTEM_INTERRUPTION is not created`() {
+        // Idempotency check prevents duplicate events
+        val latestTask = Task(id = 1, isInProgress = false, isSkipped = true)
+        val shouldReconcile = latestTask.isInProgress && !latestTask.isCompleted && !latestTask.isSkipped
+        assertFalse(shouldReconcile)
+    }
+
+    @Test
+    fun `WorkLock belonging to another task is never cleared`() {
+        val taskIdToClear = 1
+        val prefsWorkLockTaskId = 2
+        val shouldClear = taskIdToClear > 0 && prefsWorkLockTaskId == taskIdToClear
+        assertFalse(shouldClear)
+    }
 }

@@ -305,17 +305,10 @@ class RuntimeReconciliationService(context: Context) {
             prefs.pomodoroActive && prefs.pomodoroTaskId > 0 ->
                 prefs.pomodoroTaskId
 
-            prefs.activeTaskName.isNotBlank() ->
-                -2
-
             else -> null
         }
 
-        if (activeTaskId == null) {
-            return
-        }
-
-        val runtimeTask = if (activeTaskId > 0) {
+        val runtimeTask = if (activeTaskId != null && activeTaskId > 0) {
             db.taskDao().getTaskById(activeTaskId)
         } else {
             null
@@ -326,23 +319,52 @@ class RuntimeReconciliationService(context: Context) {
         } ?: false
 
         if (!stillValid) {
-            clearOwnedRuntime(
-                taskId = runtimeTask?.id ?: activeTaskId
-            )
+            if (activeTaskId != null) {
+                clearOwnedRuntime(taskId = activeTaskId)
 
-            runCatching {
-                db.taskEventDao().insert(
-                    TaskEvent(
-                        taskId = runtimeTask?.id ?: 0,
-                        taskName = runtimeTask?.name ?: "UNKNOWN",
-                        date = runtimeTask?.date ?: LocalDate.now().toString(),
-                        eventType = "ORPHAN_RUNTIME_CLEARED",
-                        timestamp = System.currentTimeMillis(),
-                        reason = "RUNTIME_REFERENCED_NO_ACTIVE_MISSION"
-                    )
-                )
-            }.onFailure {
-                Log.w(TAG, "Unable to write orphan-runtime event", it)
+                if (runtimeTask != null) {
+                    runCatching {
+                        db.taskEventDao().insert(
+                            TaskEvent(
+                                taskId = runtimeTask.id,
+                                taskName = runtimeTask.name,
+                                date = runtimeTask.date,
+                                eventType = "ORPHAN_RUNTIME_CLEARED",
+                                timestamp = System.currentTimeMillis(),
+                                reason = "RUNTIME_REFERENCED_NO_ACTIVE_MISSION"
+                            )
+                        )
+                    }.onFailure {
+                        Log.w(TAG, "Unable to write orphan-runtime event", it)
+                    }
+                } else {
+                    Log.i(TAG, "Cleared orphan runtime for missing task ID $activeTaskId without writing TaskEvent.")
+                }
+            }
+
+            if (prefs.activeTaskName.isNotBlank()) {
+                val hasMatchingValidTask = runCatching {
+                    val inProgressTasks = db.taskDao().getInProgressTasks()
+                    inProgressTasks.any { task ->
+                        task.name == prefs.activeTaskName &&
+                        task.date == prefs.activeTaskDate &&
+                        task.startTime == prefs.activeTaskStartTime &&
+                        task.endTime == prefs.activeTaskEndTime
+                    }
+                }.getOrDefault(false)
+
+                if (!hasMatchingValidTask) {
+                    Log.i(TAG, "Clearing orphaned active context without task ID.")
+                    runCatching {
+                        prefs.clearActiveMissionContextApps()
+                        prefs.activeTaskName = ""
+                        prefs.activeTaskStartTime = ""
+                        prefs.activeTaskEndTime = ""
+                        prefs.activeTaskDate = LocalDate.now().toString()
+                    }.onFailure {
+                        Log.w(TAG, "Failed to clear active mission context", it)
+                    }
+                }
             }
         }
     }
@@ -351,7 +373,7 @@ class RuntimeReconciliationService(context: Context) {
      * Cleanup is ownership-gated so reconciliation cannot destroy a runtime session
      * that belongs to another mission.
      */
-    private fun clearOwnedRuntime(taskId: Int) {
+    private suspend fun clearOwnedRuntime(taskId: Int) {
 
         if (taskId > 0 &&
             prefs.workLockTaskId == taskId &&
@@ -375,12 +397,17 @@ class RuntimeReconciliationService(context: Context) {
             }
         }
 
-        val activeContextBelongsToTask =
-            if (taskId > 0) {
-                prefs.activeTaskName.isNotBlank()
-            } else {
-                false
+        var activeContextBelongsToTask = false
+        if (taskId > 0) {
+            val task = db.taskDao().getTaskById(taskId)
+            if (task != null) {
+                activeContextBelongsToTask =
+                    prefs.activeTaskName == task.name &&
+                    prefs.activeTaskDate == task.date &&
+                    prefs.activeTaskStartTime == task.startTime &&
+                    prefs.activeTaskEndTime == task.endTime
             }
+        }
 
         if (activeContextBelongsToTask) {
             runCatching {
