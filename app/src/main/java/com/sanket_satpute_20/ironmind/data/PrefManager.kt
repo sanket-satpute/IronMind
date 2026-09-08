@@ -121,6 +121,19 @@ class PrefManager private constructor(private val prefs: SharedPreferences) {
         get() = prefs.getLong("recovery_day_timestamp", 0L)
         set(value) = prefs.edit { putLong("recovery_day_timestamp", value) }
 
+    var failureLatestJson: String
+        get() = prefs.getString("failure_latest_json", "") ?: ""
+        set(value) = prefs.edit { putString("failure_latest_json", value) }
+
+    var failureHistoryJson: String
+        get() = prefs.getString("failure_history_json", "") ?: ""
+        set(value) = prefs.edit { putString("failure_history_json", value) }
+
+    var recoveryCurrentJson: String
+        get() = prefs.getString("recovery_current_json", "") ?: ""
+        set(value) = prefs.edit { putString("recovery_current_json", value) }
+
+
     var lastCompleteDate: String
         get() = prefs.getString(KEY_LAST_COMPLETE_DATE, "") ?: ""
         set(value) = prefs.edit { putString(KEY_LAST_COMPLETE_DATE, value) }

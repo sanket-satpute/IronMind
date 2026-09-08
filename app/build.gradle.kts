@@ -94,6 +94,7 @@ dependencies {
     implementation("androidx.glance:glance-material3:1.1.0")
 
     testImplementation(libs.junit)
+    testImplementation("org.json:json:20231013")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
