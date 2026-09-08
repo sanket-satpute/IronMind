@@ -89,7 +89,7 @@ sealed interface MissionExecutionResult {
  * ([com.sanket_satpute_20.ironmind.focus.WorkStartActivity], [com.sanket_satpute_20.ironmind.focus.WorkLockActivity],
  * [com.sanket_satpute_20.ironmind.home.TaskViewModel]).
  */
-class MissionExecutionService(context: Context) {
+class MissionExecutionService(context: Context) : MissionExecutor {
 
     private val appContext = context.applicationContext
     private val db = IronMindDatabase.getDatabase(appContext)
@@ -164,9 +164,9 @@ class MissionExecutionService(context: Context) {
         }.onFailure { Log.e(TAG, "rollbackFailedStart failed for task ${failedStartTask.id}", it) }
     }
 
-    suspend fun retryMission(
+    override suspend fun retryMission(
         taskId: Int,
-        retryReason: String = "RECOVERY_RETRY"
+        retryReason: String
     ): MissionExecutionResult = mutex.withLock {
         runCatching {
             val task = db.taskDao().getTaskById(taskId) ?: return@withLock MissionExecutionResult.MissingTask(taskId)

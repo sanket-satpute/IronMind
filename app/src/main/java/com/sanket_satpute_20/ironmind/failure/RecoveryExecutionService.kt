@@ -5,6 +5,7 @@ import android.util.Log
 import com.sanket_satpute_20.ironmind.data.IronMindDatabase
 import com.sanket_satpute_20.ironmind.mission.MissionExecutionResult
 import com.sanket_satpute_20.ironmind.mission.MissionExecutionService
+import com.sanket_satpute_20.ironmind.mission.MissionExecutor
 
 /**
  * Executes an already-recommended recovery action.
@@ -13,12 +14,20 @@ import com.sanket_satpute_20.ironmind.mission.MissionExecutionService
  * RecoveryExecutionService performs the action.
  * UI is responsible only for presenting the result / collecting extra user input.
  */
-class RecoveryExecutionService(context: Context) {
+class RecoveryExecutionService(
+    private val failureService: FailureService,
+    private val missionExecutor: MissionExecutor,
+    private val db: IronMindDatabase
+) {
 
-    private val appContext = context.applicationContext
-    private val db = IronMindDatabase.getDatabase(appContext)
-    private val failureService = FailureService.create(appContext)
-    private val missionExecutionService = MissionExecutionService(appContext)
+    constructor(
+        context: Context,
+        missionExecutor: MissionExecutor = MissionExecutionService(context.applicationContext)
+    ) : this(
+        failureService = FailureService.create(context.applicationContext),
+        missionExecutor = missionExecutor,
+        db = IronMindDatabase.getDatabase(context.applicationContext)
+    )
 
     fun currentRecovery(): RecoveryState {
         return failureService.getCurrentRecovery()
@@ -151,10 +160,11 @@ class RecoveryExecutionService(context: Context) {
             )
         }
 
-        val result = missionExecutionService.retryMission(
-            taskId = action.taskId
+        val result = missionExecutor.retryMission(
+            taskId = action.taskId,
+            retryReason = "RECOVERY_RETRY"
         )
-        
+
         return when (result) {
             is MissionExecutionResult.Started ->
                 RecoveryExecutionResult.RetryStarted(
