@@ -160,6 +160,7 @@ class MissionExecutionService(context: Context) {
             clearActiveTaskWindowIfOwnedBy(failedStartTask)
             if (isWorkLockOwnedBy(failedStartTask.id)) prefs.clearWorkLock()
             if (isPomodoroOwnedBy(failedStartTask.id)) prefs.clearPomodoro()
+            prefs.clearMissionContextApps(failedStartTask.id)
         }.onFailure { Log.e(TAG, "rollbackFailedStart failed for task ${failedStartTask.id}", it) }
     }
 
@@ -206,11 +207,20 @@ class MissionExecutionService(context: Context) {
                 reason = retryReason
             )
 
+            // We use mission_context_$taskId as the durable source for the COMPLETE multi-app context.
+            // Task.packageName is treated only as a legacy single-package fallback, as it cannot
+            // fully represent the active runtime state (activeMissionContextApps) that the
+            // protection layer actually enforces.
+            val recoveredPackages = resolveRecoveryContextApps(
+                legacyPackageName = task.packageName,
+                savedContext = prefs.getMissionContextApps(taskId)
+            )
+
             return@withLock executeStartInternal(
                 originalTask = task,
                 updatedTask = updatedTask,
                 now = now,
-                allowedPackages = emptySet(),
+                allowedPackages = recoveredPackages,
                 startReason = "MISSION_RETRY_START",
                 preStartEvent = preStartEvent
             )
@@ -259,6 +269,7 @@ class MissionExecutionService(context: Context) {
         // transition above must not be left stranded with no protection behind it.
         runCatching {
             prefs.activeMissionContextApps = allowedPackages
+            prefs.saveMissionContextApps(updatedTask.id, allowedPackages)
             prefs.activeTaskName = updatedTask.name
             prefs.activeTaskStartTime = updatedTask.startTime
             prefs.activeTaskEndTime = updatedTask.endTime
@@ -368,6 +379,8 @@ class MissionExecutionService(context: Context) {
                 Log.e(TAG, "completeMission cleanup failed for task $taskId", it)
                 null
             }
+
+            prefs.clearMissionContextApps(updatedTask.id)
 
             MissionExecutionResult.Completed(updatedTask, now, pomodoroSummary)
         }.getOrElse { MissionExecutionResult.Failed("completeMission failed", it) }
@@ -513,6 +526,8 @@ class MissionExecutionService(context: Context) {
             }.getOrElse {
                 Log.e(TAG, "deferMission cleanup failed for task $taskId", it)
             }
+
+            prefs.clearMissionContextApps(updatedTask.id)
 
             MissionExecutionResult.Deferred(updatedTask, now)
         }.getOrElse { MissionExecutionResult.Failed("deferMission failed", it) }
@@ -727,4 +742,13 @@ internal fun parseTime(timeStr: String): LocalTime? {
         }
     }
     return null
+}
+
+internal fun resolveRecoveryContextApps(
+    legacyPackageName: String?,
+    savedContext: Set<String>?
+): Set<String> {
+    return savedContext
+        ?: legacyPackageName?.let { setOf(it) }
+        ?: emptySet()
 }

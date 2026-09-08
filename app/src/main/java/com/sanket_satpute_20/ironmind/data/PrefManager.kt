@@ -8,7 +8,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
 
-class PrefManager private constructor(private val prefs: SharedPreferences) {
+class PrefManager internal constructor(private val prefs: SharedPreferences) {
 
     var languageSelected: Boolean
         get() = prefs.getBoolean(KEY_LANGUAGE_SELECTED, false)
@@ -1051,6 +1051,18 @@ class PrefManager private constructor(private val prefs: SharedPreferences) {
 
     fun clearActiveMissionContextApps() {
         activeMissionContextApps = emptySet()
+    }
+
+    fun saveMissionContextApps(taskId: Int, apps: Set<String>) {
+        prefs.edit { putStringSet("mission_context_$taskId", HashSet(apps)) }
+    }
+
+    fun getMissionContextApps(taskId: Int): Set<String>? {
+        return prefs.getStringSet("mission_context_$taskId", null)?.toSet()
+    }
+
+    fun clearMissionContextApps(taskId: Int) {
+        prefs.edit { remove("mission_context_$taskId") }
     }
 
     fun clearEarnedUnlock() {
