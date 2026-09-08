@@ -28,13 +28,17 @@ class MissionOwnershipTest {
     }
 
     @Test
-    fun `active window owner check matches only on exact name and date`() {
+    fun `active window owner check matches only on exact name, date, start time, and end time`() {
         assertTrue(
             isActiveWindowOwnerOf(
                 activeName = "Deep Work",
                 activeDate = "2026-09-08",
+                activeStartTime = "09:00",
+                activeEndTime = "11:00",
                 taskName = "Deep Work",
-                taskDate = "2026-09-08"
+                taskDate = "2026-09-08",
+                taskStartTime = "09:00",
+                taskEndTime = "11:00"
             )
         )
     }
@@ -45,20 +49,28 @@ class MissionOwnershipTest {
             isActiveWindowOwnerOf(
                 activeName = "Deep Work",
                 activeDate = "2026-09-08",
+                activeStartTime = "09:00",
+                activeEndTime = "11:00",
                 taskName = "Workout",
-                taskDate = "2026-09-08"
+                taskDate = "2026-09-08",
+                taskStartTime = "09:00",
+                taskEndTime = "11:00"
             )
         )
     }
 
     @Test
-    fun `active window owner check fails for the same name on a different date`() {
+    fun `active window owner check fails for the same name on a different time`() {
         assertFalse(
             isActiveWindowOwnerOf(
                 activeName = "Deep Work",
                 activeDate = "2026-09-08",
+                activeStartTime = "09:00",
+                activeEndTime = "11:00",
                 taskName = "Deep Work",
-                taskDate = "2026-09-09"
+                taskDate = "2026-09-08",
+                taskStartTime = "11:00",
+                taskEndTime = "13:00"
             )
         )
     }
@@ -69,8 +81,12 @@ class MissionOwnershipTest {
             isActiveWindowOwnerOf(
                 activeName = "",
                 activeDate = "2026-09-08",
+                activeStartTime = "09:00",
+                activeEndTime = "11:00",
                 taskName = "Deep Work",
-                taskDate = "2026-09-08"
+                taskDate = "2026-09-08",
+                taskStartTime = "09:00",
+                taskEndTime = "11:00"
             )
         )
     }

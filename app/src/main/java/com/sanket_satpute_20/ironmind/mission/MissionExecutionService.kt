@@ -128,93 +128,13 @@ class MissionExecutionService(context: Context) {
                 syncStatus = "PENDING"
             )
 
-            // Durable state first: Task + STARTED event + FocusSession commit atomically.
-            db.withTransaction {
-                db.taskDao().updateTask(updatedTask)
-                db.taskEventDao().insert(
-                    TaskEvent(
-                        taskId = updatedTask.id,
-                        taskName = updatedTask.name,
-                        date = updatedTask.date,
-                        eventType = "STARTED",
-                        timestamp = now,
-                        newStartTime = updatedTask.startTime,
-                        newEndTime = updatedTask.endTime,
-                        focusScoreSnapshot = updatedTask.focusScore,
-                        reason = "MISSION_BRIEFING_START"
-                    )
-                )
-                db.focusSessionDao().insert(
-                    FocusSession(
-                        taskId = updatedTask.id,
-                        taskName = updatedTask.name,
-                        date = updatedTask.date,
-                        startTimestamp = now,
-                        plannedDurationMinutes = plannedDurationMinutes(updatedTask.startTime, updatedTask.endTime)
-                    )
-                )
-            }
-
-            // Runtime/execution environment second. If this throws, the durable ACTIVE
-            // transition above must not be left stranded with no protection behind it.
-            runCatching {
-                prefs.activeMissionContextApps = allowedPackages
-                prefs.activeTaskName = updatedTask.name
-                prefs.activeTaskStartTime = updatedTask.startTime
-                prefs.activeTaskEndTime = updatedTask.endTime
-                prefs.activeTaskDate = updatedTask.date
-
-                val workLockArmed = workLockManager.startForTask(
-                    taskId = updatedTask.id,
-                    taskName = updatedTask.name,
-                    taskDate = updatedTask.date,
-                    taskEndTime = updatedTask.endTime
-                )
-                val pomodoroStarted = pomodoroEngine.startForTask(updatedTask)
-
-                if (workLockArmed) {
-                    db.taskEventDao().insert(
-                        TaskEvent(
-                            taskId = updatedTask.id,
-                            taskName = updatedTask.name,
-                            date = updatedTask.date,
-                            eventType = "WORK_LOCK_STARTED",
-                            timestamp = now,
-                            oldStartTime = updatedTask.startTime,
-                            oldEndTime = updatedTask.endTime,
-                            newStartTime = updatedTask.startTime,
-                            newEndTime = updatedTask.endTime,
-                            focusScoreSnapshot = updatedTask.focusScore,
-                            reason = "SPRING_PROTOCOL_ARMED"
-                        )
-                    )
-                }
-                if (pomodoroStarted) {
-                    db.taskEventDao().insert(
-                        TaskEvent(
-                            taskId = updatedTask.id,
-                            taskName = updatedTask.name,
-                            date = updatedTask.date,
-                            eventType = "POMODORO_STARTED",
-                            timestamp = now,
-                            oldStartTime = updatedTask.startTime,
-                            oldEndTime = updatedTask.endTime,
-                            newStartTime = updatedTask.startTime,
-                            newEndTime = updatedTask.endTime,
-                            focusScoreSnapshot = updatedTask.focusScore,
-                            reason = "MISSION_BRIEFING_START"
-                        )
-                    )
-                }
-
-                FocusSessionService.start(appContext, updatedTask.name)
-                runtimePolicyController.activateForMission(updatedTask, allowedPackages)
-            }.getOrElse { runtimeError ->
-                rollbackFailedStart(task, updatedTask, now)
-                return@withLock MissionExecutionResult.Failed("startMission runtime setup failed", runtimeError)
-            }
-
-            MissionExecutionResult.Started(updatedTask, now)
+            return@withLock executeStartInternal(
+                originalTask = task,
+                updatedTask = updatedTask,
+                now = now,
+                allowedPackages = allowedPackages,
+                startReason = "MISSION_BRIEFING_START"
+            )
         }.getOrElse { MissionExecutionResult.Failed("startMission failed", it) }
     }
 
@@ -237,10 +157,164 @@ class MissionExecutionService(context: Context) {
                     )
                 )
             }
-            prefs.clearActiveMissionContextApps()
+            clearActiveTaskWindowIfOwnedBy(failedStartTask)
             if (isWorkLockOwnedBy(failedStartTask.id)) prefs.clearWorkLock()
             if (isPomodoroOwnedBy(failedStartTask.id)) prefs.clearPomodoro()
         }.onFailure { Log.e(TAG, "rollbackFailedStart failed for task ${failedStartTask.id}", it) }
+    }
+
+    suspend fun retryMission(
+        taskId: Int,
+        retryReason: String = "RECOVERY_RETRY"
+    ): MissionExecutionResult = mutex.withLock {
+        runCatching {
+            val task = db.taskDao().getTaskById(taskId) ?: return@withLock MissionExecutionResult.MissingTask(taskId)
+
+            if (task.isCompleted) return@withLock MissionExecutionResult.InvalidState(task, "Task already completed")
+            if (task.isInProgress) return@withLock MissionExecutionResult.AlreadyActive(task)
+            
+            // Must be in a failed/skipped state to be retried via this path
+            if (!task.isSkipped) {
+                return@withLock MissionExecutionResult.InvalidState(task, "Task is not in a failed/skipped state eligible for retry")
+            }
+
+            val now = System.currentTimeMillis()
+            val taskEndAt = resolveTaskEndMillis(task.date, task.endTime)
+            if (taskEndAt == null || taskEndAt <= now) {
+                return@withLock MissionExecutionResult.InvalidWindow(
+                    task,
+                    "This task window has already ended. Reschedule it before retrying."
+                )
+            }
+
+            // Reset execution eligibility fields but preserve history (skippedAt, skipReason)
+            val updatedTask = task.copy(
+                isSkipped = false,
+                isDeferred = false,
+                isInProgress = true,
+                startedAt = now, // New start attempt
+                lastModified = now,
+                syncStatus = "PENDING"
+            )
+
+            val preStartEvent = TaskEvent(
+                taskId = updatedTask.id,
+                taskName = updatedTask.name,
+                date = updatedTask.date,
+                eventType = "RETRY_REQUESTED",
+                timestamp = now,
+                reason = retryReason
+            )
+
+            return@withLock executeStartInternal(
+                originalTask = task,
+                updatedTask = updatedTask,
+                now = now,
+                allowedPackages = emptySet(),
+                startReason = "MISSION_RETRY_START",
+                preStartEvent = preStartEvent
+            )
+        }.getOrElse { MissionExecutionResult.Failed("retryMission failed", it) }
+    }
+
+    private suspend fun executeStartInternal(
+        originalTask: Task,
+        updatedTask: Task,
+        now: Long,
+        allowedPackages: Set<String>,
+        startReason: String,
+        preStartEvent: TaskEvent? = null
+    ): MissionExecutionResult {
+        // Durable state first: Task + STARTED event + FocusSession commit atomically.
+        db.withTransaction {
+            db.taskDao().updateTask(updatedTask)
+            if (preStartEvent != null) {
+                db.taskEventDao().insert(preStartEvent)
+            }
+            db.taskEventDao().insert(
+                TaskEvent(
+                    taskId = updatedTask.id,
+                    taskName = updatedTask.name,
+                    date = updatedTask.date,
+                    eventType = "STARTED",
+                    timestamp = now,
+                    newStartTime = updatedTask.startTime,
+                    newEndTime = updatedTask.endTime,
+                    focusScoreSnapshot = updatedTask.focusScore,
+                    reason = startReason
+                )
+            )
+            db.focusSessionDao().insert(
+                FocusSession(
+                    taskId = updatedTask.id,
+                    taskName = updatedTask.name,
+                    date = updatedTask.date,
+                    startTimestamp = now,
+                    plannedDurationMinutes = plannedDurationMinutes(updatedTask.startTime, updatedTask.endTime)
+                )
+            )
+        }
+
+        // Runtime/execution environment second. If this throws, the durable ACTIVE
+        // transition above must not be left stranded with no protection behind it.
+        runCatching {
+            prefs.activeMissionContextApps = allowedPackages
+            prefs.activeTaskName = updatedTask.name
+            prefs.activeTaskStartTime = updatedTask.startTime
+            prefs.activeTaskEndTime = updatedTask.endTime
+            prefs.activeTaskDate = updatedTask.date
+
+            val workLockArmed = workLockManager.startForTask(
+                taskId = updatedTask.id,
+                taskName = updatedTask.name,
+                taskDate = updatedTask.date,
+                taskEndTime = updatedTask.endTime
+            )
+            val pomodoroStarted = pomodoroEngine.startForTask(updatedTask)
+
+            if (workLockArmed) {
+                db.taskEventDao().insert(
+                    TaskEvent(
+                        taskId = updatedTask.id,
+                        taskName = updatedTask.name,
+                        date = updatedTask.date,
+                        eventType = "WORK_LOCK_STARTED",
+                        timestamp = now,
+                        oldStartTime = updatedTask.startTime,
+                        oldEndTime = updatedTask.endTime,
+                        newStartTime = updatedTask.startTime,
+                        newEndTime = updatedTask.endTime,
+                        focusScoreSnapshot = updatedTask.focusScore,
+                        reason = "SPRING_PROTOCOL_ARMED"
+                    )
+                )
+            }
+            if (pomodoroStarted) {
+                db.taskEventDao().insert(
+                    TaskEvent(
+                        taskId = updatedTask.id,
+                        taskName = updatedTask.name,
+                        date = updatedTask.date,
+                        eventType = "POMODORO_STARTED",
+                        timestamp = now,
+                        oldStartTime = updatedTask.startTime,
+                        oldEndTime = updatedTask.endTime,
+                        newStartTime = updatedTask.startTime,
+                        newEndTime = updatedTask.endTime,
+                        focusScoreSnapshot = updatedTask.focusScore,
+                        reason = startReason
+                    )
+                )
+            }
+
+            FocusSessionService.start(appContext, updatedTask.name)
+            runtimePolicyController.activateForMission(updatedTask, allowedPackages)
+        }.getOrElse { runtimeError ->
+            rollbackFailedStart(originalTask, updatedTask, now)
+            return MissionExecutionResult.Failed("startMission runtime setup failed", runtimeError)
+        }
+
+        return MissionExecutionResult.Started(updatedTask, now)
     }
 
     suspend fun completeMission(
@@ -466,7 +540,10 @@ class MissionExecutionService(context: Context) {
         isOwnerOf(prefs.pomodoroActive, prefs.pomodoroTaskId, taskId)
 
     private fun isActiveTaskWindowOwnedBy(task: Task): Boolean =
-        isActiveWindowOwnerOf(prefs.activeTaskName, prefs.activeTaskDate, task.name, task.date)
+        isActiveWindowOwnerOf(
+            prefs.activeTaskName, prefs.activeTaskDate, prefs.activeTaskStartTime, prefs.activeTaskEndTime,
+            task.name, task.date, task.startTime, task.endTime
+        )
 
     private fun clearActiveTaskWindowIfOwnedBy(task: Task) {
         if (!isActiveTaskWindowOwnedBy(task)) return
@@ -618,10 +695,14 @@ class MissionExecutionService(context: Context) {
 internal fun isOwnerOf(activeFlag: Boolean, activeOwnerTaskId: Int, taskId: Int): Boolean =
     activeFlag && activeOwnerTaskId == taskId
 
-/** Same identity guarantee as [isOwnerOf], but for the name+date based active-task window
+/** Same identity guarantee as [isOwnerOf], but for the full active-task context window
  * (PrefManager has no standalone active-task-id field to compare against). */
-internal fun isActiveWindowOwnerOf(activeName: String, activeDate: String, taskName: String, taskDate: String): Boolean =
-    activeName.isNotBlank() && activeName == taskName && activeDate == taskDate
+internal fun isActiveWindowOwnerOf(
+    activeName: String, activeDate: String, activeStartTime: String, activeEndTime: String,
+    taskName: String, taskDate: String, taskStartTime: String, taskEndTime: String
+): Boolean =
+    activeName.isNotBlank() && activeName == taskName && activeDate == taskDate &&
+    activeStartTime == taskStartTime && activeEndTime == taskEndTime
 
 internal fun plannedDurationMinutes(startTime: String, endTime: String): Int {
     val start = parseTime(startTime) ?: return 0
