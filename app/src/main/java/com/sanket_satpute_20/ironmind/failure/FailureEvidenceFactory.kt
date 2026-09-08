@@ -78,4 +78,32 @@ object FailureEvidenceFactory {
             breachCount = pomodoroSummary?.breachCount,
             focusScore = pomodoroSummary?.focusScore
         )
+
+    /**
+     * System interruption means the mission was active in durable state,
+     * but the execution environment could no longer be proven to be alive
+     * for that mission.
+     *
+     * This MUST remain a system failure and therefore must never be treated
+     * as a user discipline failure.
+     */
+    fun systemInterrupted(
+        task: Task,
+        timestamp: Long,
+        reason: String,
+        protectionWasActive: Boolean = false,
+        pomodoroSummary: PomodoroSummary? = null
+    ): FailureEvidence =
+        FailureEvidence(
+            taskId = task.id,
+            taskName = task.name,
+            date = task.date,
+            failureType = FailureType.SYSTEM_INTERRUPTION,
+            timestamp = timestamp,
+            reason = reason,
+            protectionWasActive = protectionWasActive,
+            focusMinutes = pomodoroSummary?.focusMinutes,
+            breachCount = pomodoroSummary?.breachCount,
+            focusScore = pomodoroSummary?.focusScore
+        )
 }

@@ -28,6 +28,15 @@ interface TaskDao {
     @Query("SELECT * FROM tasks WHERE id = :taskId")
     suspend fun getTaskById(taskId: Int): Task?
 
+    @Query("""
+        SELECT * FROM tasks
+        WHERE isInProgress = 1
+        AND isCompleted = 0
+        AND isSkipped = 0
+        ORDER BY startedAt ASC, id ASC
+    """)
+    suspend fun getInProgressTasks(): List<Task>
+
     @Query("DELETE FROM tasks WHERE id = :taskId")
     suspend fun deleteTaskById(taskId: Int)
 

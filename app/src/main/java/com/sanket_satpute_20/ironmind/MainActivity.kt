@@ -23,6 +23,8 @@ import com.sanket_satpute_20.ironmind.context.ContextIntelligenceService
 import kotlinx.coroutines.launch
 import com.sanket_satpute_20.ironmind.gamification.*
 import androidx.compose.runtime.CompositionLocalProvider
+import com.sanket_satpute_20.ironmind.mission.RuntimeReconciliationScheduler
+import com.sanket_satpute_20.ironmind.mission.RuntimeReconciliationService
 
 
 class MainActivity : ComponentActivity() {
@@ -66,6 +68,12 @@ class MainActivity : ComponentActivity() {
         val pref = PrefManager.getInstance(this)
         handleIntent(intent)
         
+        RuntimeReconciliationScheduler.schedule(applicationContext)
+
+        lifecycleScope.launch {
+            RuntimeReconciliationService(applicationContext).reconcile()
+        }
+
         // Relapse Re-entry detection
         if (pref.lastRelapseTimestamp > 0L) {
             val timeSinceFailureMs = System.currentTimeMillis() - pref.lastRelapseTimestamp

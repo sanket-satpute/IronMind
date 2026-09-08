@@ -379,6 +379,8 @@ class MissionExecutionService(context: Context) {
                         reason = skipReason,
                         pomodoroSummary = pomodoroSummary
                     )
+                MissionFailureContext.SYSTEM_INTERRUPTION ->
+                    throw IllegalArgumentException("SYSTEM_INTERRUPTION should not be passed to skipMission. Use RuntimeReconciliationService instead.")
             }
             recordFailureSafely(failureEvidence)
 
