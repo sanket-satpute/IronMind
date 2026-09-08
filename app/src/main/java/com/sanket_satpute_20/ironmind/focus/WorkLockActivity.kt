@@ -1278,35 +1278,43 @@ private fun sendFinishAndClose(context: Context, onClose: () -> Unit) {
     onClose()
 }
 
-private data class PomodoroSummaryPayload(
-    val taskName: String,
-    val outcome: String,
-    val intervalsCompleted: Int,
-    val focusMinutes: Int,
-    val breachCount: Int,
-    val focusScore: Int
-)
+private fun launchPomodoroSummary(
+    context: Context,
+    summary: com.sanket_satpute_20.ironmind.mission.PomodoroSummary?
+) {
+    if (summary == null) return
+    context.startActivity(
+        PomodoroSummaryActivity.createIntent(
+            context = context,
+            taskName = summary.taskName,
+            outcome = summary.outcome,
+            intervalsCompleted = summary.intervalsCompleted,
+            focusMinutes = summary.focusMinutes,
+            breachCount = summary.breachCount,
+            focusScore = summary.focusScore
+        )
+    )
+}
 
-private fun resolvePomodoroSummary(
+// Emergency exit intentionally does not go through MissionExecutionService: it exits
+// protection without resolving the Task's lifecycle (the mission may continue unprotected).
+// It still needs to summarize/close out a Pomodoro session it may own, so that narrow piece
+// of logic is kept local rather than added to the service's task-lifecycle-coupled API.
+private fun resolveEmergencyExitPomodoroSummary(
     context: Context,
     taskId: Int,
-    taskName: String,
-    outcome: String
-): PomodoroSummaryPayload? {
+    taskName: String
+): com.sanket_satpute_20.ironmind.mission.PomodoroSummary? {
     val prefs = PrefManager.getInstance(context)
     if (!prefs.pomodoroActive || prefs.pomodoroTaskId != taskId) return null
 
-    val state = when (outcome) {
-        "COMPLETE" -> PomodoroEngine(context).completeSession()
-        else -> PomodoroEngine(context).breakSession()
-    }
+    val state = PomodoroEngine(context).breakSession()
     val focusMinutes = state.completedWorkIntervals * state.preset.workMinutes
-    val penalty = if (outcome == "COMPLETE") 0 else 15
-    val focusScore = (100 - (state.breachCount * 20) - penalty).coerceIn(0, 100)
+    val focusScore = (100 - (state.breachCount * 20) - 15).coerceIn(0, 100)
 
-    return PomodoroSummaryPayload(
+    return com.sanket_satpute_20.ironmind.mission.PomodoroSummary(
         taskName = taskName,
-        outcome = outcome,
+        outcome = "EMERGENCY",
         intervalsCompleted = state.completedWorkIntervals,
         focusMinutes = focusMinutes,
         breachCount = state.breachCount,
@@ -1314,54 +1322,25 @@ private fun resolvePomodoroSummary(
     )
 }
 
-private suspend fun insertPomodoroSummaryEvent(
+private suspend fun insertEmergencyExitPomodoroEvent(
     db: IronMindDatabase,
     taskEvent: TaskEvent,
-    payload: PomodoroSummaryPayload,
+    summary: com.sanket_satpute_20.ironmind.mission.PomodoroSummary,
     timestamp: Long
 ) {
-    val eventType = when (payload.outcome) {
-        "COMPLETE" -> "POMODORO_COMPLETED"
-        "BROKEN" -> "POMODORO_BROKEN"
-        "EMERGENCY" -> "POMODORO_EMERGENCY_EXIT"
-        else -> "POMODORO_COMPLETED"
-    }
     val reason = buildString {
-        append("INTERVALS=")
-        append(payload.intervalsCompleted)
-        append(";MINUTES=")
-        append(payload.focusMinutes)
-        append(";BREACHES=")
-        append(payload.breachCount)
-        append(";SCORE=")
-        append(payload.focusScore)
-        append(";OUTCOME=")
-        append(payload.outcome)
+        append("INTERVALS=").append(summary.intervalsCompleted)
+        append(";MINUTES=").append(summary.focusMinutes)
+        append(";BREACHES=").append(summary.breachCount)
+        append(";SCORE=").append(summary.focusScore)
+        append(";OUTCOME=").append(summary.outcome)
     }
     db.taskEventDao().insert(
         taskEvent.copy(
             id = 0,
-            eventType = eventType,
+            eventType = "POMODORO_EMERGENCY_EXIT",
             timestamp = timestamp,
             reason = reason
-        )
-    )
-}
-
-private fun launchPomodoroSummary(
-    context: Context,
-    payload: PomodoroSummaryPayload?
-) {
-    if (payload == null) return
-    context.startActivity(
-        PomodoroSummaryActivity.createIntent(
-            context = context,
-            taskName = payload.taskName,
-            outcome = payload.outcome,
-            intervalsCompleted = payload.intervalsCompleted,
-            focusMinutes = payload.focusMinutes,
-            breachCount = payload.breachCount,
-            focusScore = payload.focusScore
         )
     )
 }
@@ -1387,11 +1366,13 @@ private fun clearActiveTaskWindow(prefs: PrefManager) {
     prefs.activeTaskDate = LocalDate.now().toString()
 }
 
+// MissionExecutionService owns the Task/TaskEvent lifecycle transition AND the execution
+// cleanup (WorkLock end, Pomodoro termination, FocusSession finalize, active-window clear,
+// EarnedUnlock sync, RuntimePolicy refresh). This function is now UI-adjacent only: resolve
+// which task is live, call the service, and render the resulting Pomodoro summary if any.
 private fun completeCurrentMission(context: Context, manager: WorkLockManager) {
     val prefs = PrefManager.getInstance(context)
-    val now = System.currentTimeMillis()
     CoroutineScope(Dispatchers.IO).launch {
-        val earnedUnlockManager = EarnedUnlockManager(context)
         val db = IronMindDatabase.getDatabase(context)
         val task = resolveCurrentLiveTask(db, prefs) ?: return@launch
         val missionResult = MissionExecutionService(context).completeMission(
@@ -1400,61 +1381,12 @@ private fun completeCurrentMission(context: Context, manager: WorkLockManager) {
             eventReason = "WORK_LOCK_COMPLETE"
         )
         if (missionResult !is MissionExecutionResult.Completed) return@launch
-        db.taskEventDao().insert(
-            TaskEvent(
-                taskId = task.id,
-                taskName = task.name,
-                date = task.date,
-                eventType = "WORK_LOCK_COMPLETED",
-                timestamp = now,
-                oldStartTime = task.startTime,
-                oldEndTime = task.endTime,
-                newStartTime = task.startTime,
-                newEndTime = task.endTime,
-                focusScoreSnapshot = task.focusScore,
-                reason = "SPRING_PROTOCOL_COMPLETE"
-            )
-        )
-        val pomodoroSummary = resolvePomodoroSummary(
-            context = context,
-            taskId = task.id,
-            taskName = task.name,
-            outcome = "COMPLETE"
-        )
-        if (pomodoroSummary != null) {
-            insertPomodoroSummaryEvent(
-                db = db,
-                taskEvent = TaskEvent(
-                    taskId = task.id,
-                    taskName = task.name,
-                    date = task.date,
-                    eventType = "POMODORO_COMPLETED",
-                    timestamp = now,
-                    oldStartTime = task.startTime,
-                    oldEndTime = task.endTime,
-                    newStartTime = task.startTime,
-                    newEndTime = task.endTime,
-                    focusScoreSnapshot = task.focusScore
-                ),
-                payload = pomodoroSummary,
-                timestamp = now
-            )
-        }
-        FocusSessionService.stop(context)
-        if (pomodoroSummary == null) {
-            prefs.clearPomodoro()
-        }
-        clearActiveTaskWindow(prefs)
-        prefs.clearActiveMissionContextApps()
-        earnedUnlockManager.syncTodayFromDatabase()
-        manager.endForCompletion()
-        launchPomodoroSummary(context, pomodoroSummary)
+        launchPomodoroSummary(context, missionResult.pomodoroSummary)
     }
 }
 
 private fun breakCurrentMission(context: Context, manager: WorkLockManager) {
     val prefs = PrefManager.getInstance(context)
-    val now = System.currentTimeMillis()
     CoroutineScope(Dispatchers.IO).launch {
         val earnedUnlockManager = EarnedUnlockManager(context)
         val db = IronMindDatabase.getDatabase(context)
@@ -1466,55 +1398,7 @@ private fun breakCurrentMission(context: Context, manager: WorkLockManager) {
                     eventReason = "WORK_LOCK_BREAK"
                 )
                 if (missionResult !is MissionExecutionResult.Skipped) return@launch
-                db.taskEventDao().insert(
-                    TaskEvent(
-                        taskId = task.id,
-                        taskName = task.name,
-                        date = task.date,
-                        eventType = "WORK_LOCK_BROKEN",
-                        timestamp = now,
-                        oldStartTime = task.startTime,
-                        oldEndTime = task.endTime,
-                        newStartTime = task.startTime,
-                        newEndTime = task.endTime,
-                        focusScoreSnapshot = task.focusScore,
-                        reason = "SPRING_PROTOCOL_BROKEN"
-                    )
-                )
-                val pomodoroSummary = resolvePomodoroSummary(
-                    context = context,
-                    taskId = task.id,
-                    taskName = task.name,
-                    outcome = "BROKEN"
-                )
-                if (pomodoroSummary != null) {
-                    insertPomodoroSummaryEvent(
-                        db = db,
-                        taskEvent = TaskEvent(
-                            taskId = task.id,
-                            taskName = task.name,
-                            date = task.date,
-                            eventType = "POMODORO_BROKEN",
-                            timestamp = now,
-                            oldStartTime = task.startTime,
-                            oldEndTime = task.endTime,
-                            newStartTime = task.startTime,
-                            newEndTime = task.endTime,
-                            focusScoreSnapshot = task.focusScore
-                        ),
-                        payload = pomodoroSummary,
-                        timestamp = now
-                    )
-                }
-                FocusSessionService.stop(context)
-                if (pomodoroSummary == null) {
-                    prefs.clearPomodoro()
-                }
-                clearActiveTaskWindow(prefs)
-                prefs.clearActiveMissionContextApps()
-                earnedUnlockManager.syncTodayFromDatabase()
-                manager.breakMissionWithPenalty()
-                launchPomodoroSummary(context, pomodoroSummary)
+                launchPomodoroSummary(context, missionResult.pomodoroSummary)
                 return@launch
         }
         FocusSessionService.stop(context)
@@ -1529,7 +1413,7 @@ private fun breakCurrentMission(context: Context, manager: WorkLockManager) {
 private fun emergencyExit(context: Context, manager: WorkLockManager) {
     val prefs = PrefManager.getInstance(context)
     CoroutineScope(Dispatchers.IO).launch {
-        var pomodoroSummary: PomodoroSummaryPayload? = null
+        var pomodoroSummary: com.sanket_satpute_20.ironmind.mission.PomodoroSummary? = null
         val db = IronMindDatabase.getDatabase(context)
         val task = resolveCurrentLiveTask(db, prefs)
         if (task != null) {
@@ -1548,14 +1432,13 @@ private fun emergencyExit(context: Context, manager: WorkLockManager) {
                         reason = "SPRING_PROTOCOL_EMERGENCY_EXIT"
                     )
                 )
-                pomodoroSummary = resolvePomodoroSummary(
+                pomodoroSummary = resolveEmergencyExitPomodoroSummary(
                     context = context,
                     taskId = task.id,
-                    taskName = task.name,
-                    outcome = "EMERGENCY"
+                    taskName = task.name
                 )
                 if (pomodoroSummary != null) {
-                    insertPomodoroSummaryEvent(
+                    insertEmergencyExitPomodoroEvent(
                         db = db,
                         taskEvent = TaskEvent(
                             taskId = task.id,
@@ -1569,7 +1452,7 @@ private fun emergencyExit(context: Context, manager: WorkLockManager) {
                             newEndTime = task.endTime,
                             focusScoreSnapshot = task.focusScore
                         ),
-                        payload = pomodoroSummary,
+                        summary = pomodoroSummary,
                         timestamp = System.currentTimeMillis()
                     )
                 }

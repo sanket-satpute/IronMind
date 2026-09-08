@@ -500,15 +500,12 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             }
             val updatedTask = when (missionResult) {
                 is MissionExecutionResult.Completed -> missionResult.task
+                is MissionExecutionResult.AlreadyCompleted -> missionResult.task
                 is MissionExecutionResult.Skipped -> missionResult.task
+                is MissionExecutionResult.AlreadySkipped -> missionResult.task
                 else -> task
             }
 
-            completeFocusSessionForTask(
-                updatedTask,
-                result = if (completed) "COMPLETED" else "SKIPPED",
-                completed = completed
-            )
             updatedTask
         }
 
@@ -574,24 +571,6 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         gamificationEngine.addXp(bonusXp)
         prefManager.morningBonusAppliedDate = todayKey
         _totalXp.value = prefManager.totalXp
-    }
-
-    private suspend fun completeFocusSessionForTask(task: Task, result: String, completed: Boolean) {
-        val activeSession = focusSessionDao.getActiveSessionForTask(task.id) ?: return
-        val endTimestamp = System.currentTimeMillis()
-        val durationMinutes = ((endTimestamp - activeSession.startTimestamp) / 60_000L).coerceAtLeast(0L).toInt()
-        focusSessionDao.update(
-            activeSession.copy(
-                endTimestamp = endTimestamp,
-                actualDurationMinutes = durationMinutes,
-                result = result,
-                completed = completed,
-                usedResetProtocol = prefManager.emergencyValveCooldownUntil > activeSession.startTimestamp,
-                cooldownUsed = prefManager.emergencyValveCooldownActive,
-                lastModified = endTimestamp,
-                syncStatus = "PENDING"
-            )
-        )
     }
 
     private fun normalizeSkipReason(reason: String, task: Task): String {

@@ -227,10 +227,6 @@ class WorkStartActivity : ComponentActivity() {
     private fun deferTask(taskId: Int) {
         if (taskId == -1) return
         val prefs = PrefManager.getInstance(this)
-        prefs.clearActiveMissionContextApps()
-        prefs.clearWorkLock()
-        prefs.clearPomodoro()
-        sendBroadcast(Intent("com.ironmind.RELOAD_GUARD").apply { setPackage(packageName) })
         com.sanket_satpute_20.ironmind.gamification.GamificationEngine.getInstance(this).penalizeXp(5L)
         val missionExecutionService = MissionExecutionService(this)
         CoroutineScope(Dispatchers.IO).launch {
@@ -243,10 +239,6 @@ class WorkStartActivity : ComponentActivity() {
         if (taskId == -1) return shieldShattered
         com.sanket_satpute_20.ironmind.gamification.HapticsManager.getInstance(this).playError(); com.sanket_satpute_20.ironmind.gamification.SoundManager.getInstance(this).playTemptationBlocked()
         val prefs = PrefManager.getInstance(this)
-        prefs.clearActiveMissionContextApps()
-        prefs.clearWorkLock()
-        prefs.clearPomodoro()
-        sendBroadcast(Intent("com.ironmind.RELOAD_GUARD").apply { setPackage(packageName) })
         com.sanket_satpute_20.ironmind.gamification.GamificationEngine.getInstance(this).penalizeXp(25L)
         if (prefs.streakShields > 0) {
             prefs.streakShields = prefs.streakShields - 1
