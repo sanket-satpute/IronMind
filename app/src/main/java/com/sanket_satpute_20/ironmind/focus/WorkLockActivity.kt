@@ -86,6 +86,7 @@ import android.util.Log
 import com.sanket_satpute_20.ironmind.data.TaskEvent
 import com.sanket_satpute_20.ironmind.failure.FailureEvidenceFactory
 import com.sanket_satpute_20.ironmind.failure.FailureService
+import com.sanket_satpute_20.ironmind.failure.MissionFailureContext
 import com.sanket_satpute_20.ironmind.focus.EarnedUnlockManager
 import com.sanket_satpute_20.ironmind.focus.FocusSessionService
 import com.sanket_satpute_20.ironmind.mission.MissionExecutionResult
@@ -1400,7 +1401,8 @@ private fun breakCurrentMission(context: Context, manager: WorkLockManager) {
                 val missionResult = MissionExecutionService(context).skipMission(
                     taskId = task.id,
                     skipReason = "WORK_LOCK_BREAK",
-                    eventReason = "WORK_LOCK_BREAK"
+                    eventReason = "WORK_LOCK_BREAK",
+                    failureContext = MissionFailureContext.WORK_LOCK_BREAK
                 )
                 if (missionResult !is MissionExecutionResult.Skipped) return@launch
                 launchPomodoroSummary(context, missionResult.pomodoroSummary)
@@ -1422,13 +1424,14 @@ private fun emergencyExit(context: Context, manager: WorkLockManager) {
         val db = IronMindDatabase.getDatabase(context)
         val task = resolveCurrentLiveTask(db, prefs)
         if (task != null) {
+                val now = System.currentTimeMillis()
                 db.taskEventDao().insert(
                     TaskEvent(
                         taskId = task.id,
                         taskName = task.name,
                         date = task.date,
                         eventType = "WORK_LOCK_EMERGENCY_EXIT",
-                        timestamp = System.currentTimeMillis(),
+                        timestamp = now,
                         oldStartTime = task.startTime,
                         oldEndTime = task.endTime,
                         newStartTime = task.startTime,
@@ -1450,7 +1453,7 @@ private fun emergencyExit(context: Context, manager: WorkLockManager) {
                             taskName = task.name,
                             date = task.date,
                             eventType = "POMODORO_EMERGENCY_EXIT",
-                            timestamp = System.currentTimeMillis(),
+                            timestamp = now,
                             oldStartTime = task.startTime,
                             oldEndTime = task.endTime,
                             newStartTime = task.startTime,
@@ -1458,7 +1461,7 @@ private fun emergencyExit(context: Context, manager: WorkLockManager) {
                             focusScoreSnapshot = task.focusScore
                         ),
                         summary = pomodoroSummary,
-                        timestamp = System.currentTimeMillis()
+                        timestamp = now
                     )
                 }
                 
@@ -1466,7 +1469,7 @@ private fun emergencyExit(context: Context, manager: WorkLockManager) {
                     val failureService = FailureService.create(context)
                     val evidence = FailureEvidenceFactory.emergencyExit(
                         task = task,
-                        timestamp = System.currentTimeMillis(),
+                        timestamp = now,
                         reason = "SPRING_PROTOCOL_EMERGENCY_EXIT",
                         pomodoroSummary = pomodoroSummary
                     )

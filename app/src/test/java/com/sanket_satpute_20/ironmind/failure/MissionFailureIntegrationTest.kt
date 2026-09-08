@@ -138,4 +138,24 @@ class MissionFailureIntegrationTest {
         val recovery = failureService.getCurrentRecovery()
         assertEquals(FailureType.EMERGENCY_EXIT, (recovery as RecoveryState.Required).evidence.failureType)
     }
+
+    @Test
+    fun `POMODORO_BREAK creates POMODORO_BROKEN evidence and recommends TakeRecoveryBreak`() {
+        val task = mockTask(5, "Pomodoro Mission")
+        val summary = PomodoroSummary(task.name, "BROKEN", 2, 50, 0, 70)
+        val evidence = FailureEvidenceFactory.pomodoroBroken(
+            task = task,
+            timestamp = 4000L,
+            reason = "Pomodoro broken explicitly",
+            pomodoroSummary = summary
+        )
+
+        val result = failureService.recordFailure(evidence)
+        assertTrue(result is FailureRecordResult.Recorded)
+
+        val recovery = failureService.getCurrentRecovery()
+        assertTrue(recovery is RecoveryState.Required)
+        assertEquals(FailureType.POMODORO_BROKEN, (recovery as RecoveryState.Required).evidence.failureType)
+        assertEquals(RecoveryAction.RetryMission(5), recovery.recommendedAction)
+    }
 }

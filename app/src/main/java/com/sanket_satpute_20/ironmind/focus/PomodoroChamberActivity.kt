@@ -62,6 +62,12 @@ import com.sanket_satpute_20.ironmind.data.HistoryRecorder
 import com.sanket_satpute_20.ironmind.gamification.SoundManager
 import com.sanket_satpute_20.ironmind.ui.theme.IronMindTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import com.sanket_satpute_20.ironmind.failure.MissionFailureContext
+import com.sanket_satpute_20.ironmind.mission.MissionExecutionService
+import com.sanket_satpute_20.ironmind.mission.MissionExecutionResult
 import com.sanket_satpute_20.ironmind.ui.theme.DeepBackground
 import com.sanket_satpute_20.ironmind.ui.theme.SurfaceDark
 import com.sanket_satpute_20.ironmind.ui.theme.SurfaceElevated
@@ -917,11 +923,73 @@ private fun finishSession(
     focusScore: Int,
     onClose: () -> Unit
 ) {
-    val finalState = when (outcome) {
-        "COMPLETE" -> engine.completeSession()
-        else -> engine.breakSession()
-    }
-    if (finalState.source == PomodoroSessionSource.HOME) {
+    if (state.source == PomodoroSessionSource.TASK) {
+        CoroutineScope(Dispatchers.IO).launch {
+            if (outcome == "COMPLETE") {
+                val res = MissionExecutionService(context).completeMission(
+                    taskId = state.taskId!!,
+                    completionSource = "POMODORO_COMPLETE",
+                    eventReason = "POMODORO_COMPLETED"
+                )
+                if (res is MissionExecutionResult.Completed) {
+                    context.startActivity(
+                        PomodoroSummaryActivity.createIntent(
+                            context = context,
+                            taskName = state.title.ifBlank { "Some Work" },
+                            outcome = outcome,
+                            intervalsCompleted = res.pomodoroSummary?.intervalsCompleted ?: state.completedWorkIntervals,
+                            focusMinutes = res.pomodoroSummary?.focusMinutes ?: focusMinutes,
+                            breachCount = res.pomodoroSummary?.breachCount ?: state.breachCount,
+                            focusScore = res.pomodoroSummary?.focusScore ?: focusScore,
+                            source = state.source.name,
+                            windowLabel = buildSessionWindowLabel(state)
+                        )
+                    )
+                }
+            } else if (outcome == "EMERGENCY") {
+                val finalState = engine.breakSession()
+                context.startActivity(
+                    PomodoroSummaryActivity.createIntent(
+                        context = context,
+                        taskName = finalState.title.ifBlank { "Some Work" },
+                        outcome = outcome,
+                        intervalsCompleted = finalState.completedWorkIntervals,
+                        focusMinutes = focusMinutes,
+                        breachCount = finalState.breachCount,
+                        focusScore = focusScore,
+                        source = finalState.source.name,
+                        windowLabel = buildSessionWindowLabel(finalState)
+                    )
+                )
+            } else {
+                val res = MissionExecutionService(context).skipMission(
+                    taskId = state.taskId!!,
+                    skipReason = "POMODORO_BROKEN",
+                    eventReason = "POMODORO_BROKEN",
+                    failureContext = MissionFailureContext.POMODORO_BREAK
+                )
+                if (res is MissionExecutionResult.Skipped) {
+                    context.startActivity(
+                        PomodoroSummaryActivity.createIntent(
+                            context = context,
+                            taskName = state.title.ifBlank { "Some Work" },
+                            outcome = outcome,
+                            intervalsCompleted = res.pomodoroSummary?.intervalsCompleted ?: state.completedWorkIntervals,
+                            focusMinutes = res.pomodoroSummary?.focusMinutes ?: focusMinutes,
+                            breachCount = res.pomodoroSummary?.breachCount ?: state.breachCount,
+                            focusScore = res.pomodoroSummary?.focusScore ?: focusScore,
+                            source = state.source.name,
+                            windowLabel = buildSessionWindowLabel(state)
+                        )
+                    )
+                }
+            }
+        }
+    } else {
+        val finalState = when (outcome) {
+            "COMPLETE" -> engine.completeSession()
+            else -> engine.breakSession()
+        }
         HistoryRecorder.recordConfigChange(
             context = context,
             configType = when (outcome) {
@@ -938,20 +1006,20 @@ private fun finishSession(
             ),
             sourceScreen = "POMODORO_CHAMBER"
         )
-    }
-    context.startActivity(
-        PomodoroSummaryActivity.createIntent(
-            context = context,
-            taskName = finalState.title.ifBlank { "Some Work" },
-            outcome = outcome,
-            intervalsCompleted = finalState.completedWorkIntervals,
-            focusMinutes = focusMinutes,
-            breachCount = finalState.breachCount,
-            focusScore = focusScore,
-            source = finalState.source.name,
-            windowLabel = buildSessionWindowLabel(finalState)
+        context.startActivity(
+            PomodoroSummaryActivity.createIntent(
+                context = context,
+                taskName = finalState.title.ifBlank { "Some Work" },
+                outcome = outcome,
+                intervalsCompleted = finalState.completedWorkIntervals,
+                focusMinutes = focusMinutes,
+                breachCount = finalState.breachCount,
+                focusScore = focusScore,
+                source = finalState.source.name,
+                windowLabel = buildSessionWindowLabel(finalState)
+            )
         )
-    )
+    }
     onClose()
 }
 
