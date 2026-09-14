@@ -1,5 +1,9 @@
 package com.sanket_satpute_20.ironmind.mission
 
+import com.sanket_satpute_20.ironmind.core.logging.IronMindLogger
+import com.sanket_satpute_20.ironmind.protection.ProtectionReadiness
+import com.sanket_satpute_20.ironmind.protection.ProtectionReadinessService
+
 import android.content.Context
 import android.util.Log
 import androidx.room.withTransaction
@@ -46,6 +50,8 @@ sealed interface MissionExecutionResult {
 
     data class Started(val task: Task, val startedAt: Long) : MissionExecutionResult
 
+    data class StartBlocked(val task: Task, val reason: String, val missingCapabilities: List<String>) : MissionExecutionResult
+
     data class AlreadyActive(val task: Task) : MissionExecutionResult
 
     /** A completion transition genuinely occurred as a result of this call. */
@@ -89,7 +95,10 @@ sealed interface MissionExecutionResult {
  * ([com.sanket_satpute_20.ironmind.focus.WorkStartActivity], [com.sanket_satpute_20.ironmind.focus.WorkLockActivity],
  * [com.sanket_satpute_20.ironmind.home.TaskViewModel]).
  */
-class MissionExecutionService(context: Context) : MissionExecutor {
+class MissionExecutionService(
+    context: Context,
+    private val protectionReadinessService: ProtectionReadinessService = ProtectionReadinessService(context.applicationContext)
+) : MissionExecutor {
 
     private val appContext = context.applicationContext
     private val db = IronMindDatabase.getDatabase(appContext)
@@ -111,6 +120,24 @@ class MissionExecutionService(context: Context) : MissionExecutor {
             if (task.isSkipped) return@withLock MissionExecutionResult.InvalidState(task, "Task already skipped")
             if (task.isInProgress) return@withLock MissionExecutionResult.AlreadyActive(task)
 
+            IronMindLogger.log("MissionExecutionService", "START_REQUEST", mapOf(
+                "taskId" to taskId,
+                "allowedPackages" to allowedPackages.size
+            ))
+
+            val readiness = protectionReadinessService.evaluate()
+            if (readiness is ProtectionReadiness.NotReady) {
+                val missing = readiness.missingRequired.map { it.name }
+                IronMindLogger.log("MissionExecutionService", "START_BLOCKED", mapOf(
+                    "taskId" to taskId,
+                    "reason" to "PROTECTION_NOT_READY",
+                    "missing" to missing
+                ))
+                return@withLock MissionExecutionResult.StartBlocked(task, "PROTECTION_NOT_READY", missing)
+            }
+
+            IronMindLogger.log("MissionExecutionService", "START_EXECUTING", mapOf("taskId" to taskId))
+
             val now = System.currentTimeMillis()
             val taskEndAt = resolveTaskEndMillis(task.date, task.endTime)
             if (taskEndAt == null || taskEndAt <= now) {
@@ -128,14 +155,23 @@ class MissionExecutionService(context: Context) : MissionExecutor {
                 syncStatus = "PENDING"
             )
 
-            return@withLock executeStartInternal(
+            val result = executeStartInternal(
                 originalTask = task,
                 updatedTask = updatedTask,
                 now = now,
                 allowedPackages = allowedPackages,
                 startReason = "MISSION_BRIEFING_START"
             )
-        }.getOrElse { MissionExecutionResult.Failed("startMission failed", it) }
+            IronMindLogger.log("MissionExecutionService", "START_SUCCESS", mapOf(
+                "taskId" to updatedTask.id,
+                "taskState" to "IN_PROGRESS",
+                "allowedPackages" to allowedPackages.size
+            ))
+            return@withLock result
+        }.getOrElse { 
+            IronMindLogger.e("MissionExecutionService", "START_FAILED", mapOf("taskId" to taskId), it)
+            MissionExecutionResult.Failed("startMission failed", it) 
+        }
     }
 
     /** Reverts a mission whose durable ACTIVE transition committed but whose execution
@@ -179,6 +215,24 @@ class MissionExecutionService(context: Context) : MissionExecutor {
                 return@withLock MissionExecutionResult.InvalidState(task, "Task is not in a failed/skipped state eligible for retry")
             }
 
+            IronMindLogger.log("MissionExecutionService", "RETRY_REQUEST", mapOf(
+                "taskId" to taskId,
+                "reason" to retryReason
+            ))
+
+            val readiness = protectionReadinessService.evaluate()
+            if (readiness is ProtectionReadiness.NotReady) {
+                val missing = readiness.missingRequired.map { it.name }
+                IronMindLogger.log("MissionExecutionService", "START_BLOCKED", mapOf(
+                    "taskId" to taskId,
+                    "reason" to "PROTECTION_NOT_READY",
+                    "missing" to missing
+                ))
+                return@withLock MissionExecutionResult.StartBlocked(task, "PROTECTION_NOT_READY", missing)
+            }
+
+            IronMindLogger.log("MissionExecutionService", "START_EXECUTING", mapOf("taskId" to taskId))
+
             val now = System.currentTimeMillis()
             val taskEndAt = resolveTaskEndMillis(task.date, task.endTime)
             if (taskEndAt == null || taskEndAt <= now) {
@@ -216,7 +270,7 @@ class MissionExecutionService(context: Context) : MissionExecutor {
                 savedContext = prefs.getMissionContextApps(taskId)
             )
 
-            return@withLock executeStartInternal(
+            val result = executeStartInternal(
                 originalTask = task,
                 updatedTask = updatedTask,
                 now = now,
@@ -224,7 +278,16 @@ class MissionExecutionService(context: Context) : MissionExecutor {
                 startReason = "MISSION_RETRY_START",
                 preStartEvent = preStartEvent
             )
-        }.getOrElse { MissionExecutionResult.Failed("retryMission failed", it) }
+            IronMindLogger.log("MissionExecutionService", "RETRY_SUCCESS", mapOf(
+                "taskId" to updatedTask.id,
+                "taskState" to "IN_PROGRESS",
+                "recoveredPackages" to recoveredPackages.size
+            ))
+            return@withLock result
+        }.getOrElse { 
+            IronMindLogger.e("MissionExecutionService", "RETRY_FAILED", mapOf("taskId" to taskId), it)
+            MissionExecutionResult.Failed("retryMission failed", it) 
+        }
     }
 
     private suspend fun executeStartInternal(
@@ -382,8 +445,15 @@ class MissionExecutionService(context: Context) : MissionExecutor {
 
             prefs.clearMissionContextApps(updatedTask.id)
 
+            IronMindLogger.log("MissionExecutionService", "COMPLETED", mapOf(
+                "taskId" to updatedTask.id,
+                "pomodoroOutcome" to (pomodoroSummary?.outcome ?: "NONE")
+            ))
             MissionExecutionResult.Completed(updatedTask, now, pomodoroSummary)
-        }.getOrElse { MissionExecutionResult.Failed("completeMission failed", it) }
+        }.getOrElse { 
+            IronMindLogger.e("MissionExecutionService", "COMPLETE_FAILED", mapOf("taskId" to taskId), it)
+            MissionExecutionResult.Failed("completeMission failed", it) 
+        }
     }
 
     suspend fun skipMission(
@@ -471,8 +541,15 @@ class MissionExecutionService(context: Context) : MissionExecutor {
             }
             recordFailureSafely(failureEvidence)
 
+            IronMindLogger.log("MissionExecutionService", "SKIPPED", mapOf(
+                "taskId" to updatedTask.id,
+                "reason" to skipReason
+            ))
             MissionExecutionResult.Skipped(updatedTask, now, pomodoroSummary)
-        }.getOrElse { MissionExecutionResult.Failed("skipMission failed", it) }
+        }.getOrElse { 
+            IronMindLogger.e("MissionExecutionService", "SKIP_FAILED", mapOf("taskId" to taskId), it)
+            MissionExecutionResult.Failed("skipMission failed", it) 
+        }
     }
 
     suspend fun deferMission(

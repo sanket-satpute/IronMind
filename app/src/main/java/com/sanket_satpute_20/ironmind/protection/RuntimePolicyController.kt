@@ -1,5 +1,7 @@
 package com.sanket_satpute_20.ironmind.protection
 
+import com.sanket_satpute_20.ironmind.core.logging.IronMindLogger
+
 import android.content.Context
 import android.content.Intent
 import com.sanket_satpute_20.ironmind.data.Task
@@ -21,18 +23,21 @@ class RuntimePolicyController(context: Context) {
         allowedPackages: Set<String>
     ): RuntimePolicy {
         val policy = repository.buildForMission(task = task, allowedPackages = allowedPackages)
+        IronMindLogger.log("RuntimePolicyController", "ACTIVATE", mapOf("taskId" to task.id, "allowedPackages" to allowedPackages.size))
         publishPolicyChanged()
         return policy
     }
 
     fun refresh(): RuntimePolicy {
         val policy = repository.currentPolicy()
+        IronMindLogger.log("RuntimePolicyController", "REFRESH", mapOf("reason" to policy.reason))
         publishPolicyChanged()
         return policy
     }
 
     fun clear(): RuntimePolicy {
         val policy = repository.clear()
+        IronMindLogger.log("RuntimePolicyController", "CLEAR")
         publishPolicyChanged()
         return policy
     }
@@ -54,3 +59,4 @@ class RuntimePolicyController(context: Context) {
         const val ACTION_RELOAD_GUARD = "com.ironmind.RELOAD_GUARD"
     }
 }
+

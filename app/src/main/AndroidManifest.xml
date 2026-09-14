@@ -289,13 +289,17 @@
 
         <service
             android:name=".punishment.PunishmentForegroundService"
-            android:foregroundServiceType="dataSync"
-            android:exported="false"/>
+            android:foregroundServiceType="specialUse"
+            android:exported="false">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Provides a continuous countdown timer for active focus discipline enforcement" />
+        </service>
 
         <service
             android:name=".focus.FocusSessionService"
-            android:foregroundServiceType="dataSync"
-            android:exported="false"/>
+            android:foregroundServiceType="specialUse"
+            android:exported="false">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="Provides an active focus and productivity session timer" />
+        </service>
 
         <service
             android:name=".sleeplock.SleepLockSoundService"

@@ -39,7 +39,12 @@ class FocusSessionService : Service() {
             startTimeMillis = System.currentTimeMillis()
             isRunning = true
             currentTaskName = taskName
-            startForeground(201, createNotification(taskName, "00:00", lastCrackCount))
+            val notification = createNotification(taskName, "00:00", lastCrackCount)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(201, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } else {
+                startForeground(201, notification)
+            }
 
             serviceScope.launch {
                 while (isRunning) {

@@ -1,5 +1,7 @@
 package com.sanket_satpute_20.ironmind.mission
 
+import com.sanket_satpute_20.ironmind.core.logging.IronMindLogger
+
 import android.content.Context
 import android.util.Log
 import androidx.room.withTransaction
@@ -75,6 +77,7 @@ class RuntimeReconciliationService(context: Context) {
                         now = now,
                         reason = "MULTIPLE_ACTIVE_MISSIONS"
                     )
+                    IronMindLogger.log("RuntimeReconciliation", "MULTIPLE_ACTIVE_MISSIONS", mapOf("taskId" to task.id, "ownerId" to owner.id))
                     report = report.copy(
                         interruptedCount = report.interruptedCount + 1
                     )
@@ -99,6 +102,7 @@ class RuntimeReconciliationService(context: Context) {
                     now = now,
                     reason = "MISSION_WINDOW_EXPIRED_WHILE_IN_PROGRESS"
                 )
+                IronMindLogger.log("RuntimeReconciliation", "MISSION_EXPIRED", mapOf("taskId" to currentOwner.id))
 
                 report = report.copy(
                     expiredCount = report.expiredCount + 1
@@ -118,6 +122,7 @@ class RuntimeReconciliationService(context: Context) {
                     task = currentOwner,
                     allowedPackages = prefs.activeMissionContextApps
                 )
+                IronMindLogger.log("RuntimeReconciliation", "REHYDRATED", mapOf("taskId" to currentOwner.id))
 
                 restartFocusRuntimeIfRequired(currentOwner)
 
@@ -130,6 +135,7 @@ class RuntimeReconciliationService(context: Context) {
                     now = now,
                     reason = "MISSION_RUNTIME_MISSING"
                 )
+                IronMindLogger.log("RuntimeReconciliation", "RUNTIME_MISSING", mapOf("taskId" to currentOwner.id))
 
                 report = report.copy(
                     interruptedCount = report.interruptedCount + 1
@@ -298,6 +304,7 @@ class RuntimeReconciliationService(context: Context) {
      * Clears runtime state that no longer points to a live in-progress mission.
      */
     private suspend fun reconcileOrphanedRuntime() {
+        IronMindLogger.log("RuntimeReconciliation", "ORPHAN_CLEANUP")
         val activeTaskId = when {
             prefs.workLockActive && prefs.workLockTaskId > 0 ->
                 prefs.workLockTaskId
@@ -474,3 +481,4 @@ class RuntimeReconciliationService(context: Context) {
         private val mutex = Mutex()
     }
 }
+

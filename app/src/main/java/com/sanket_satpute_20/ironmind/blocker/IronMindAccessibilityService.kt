@@ -1,5 +1,7 @@
 package com.sanket_satpute_20.ironmind.blocker
 
+import com.sanket_satpute_20.ironmind.core.logging.IronMindLogger
+
 import android.accessibilityservice.AccessibilityService
 import android.content.*
 import android.os.Build
@@ -264,13 +266,21 @@ class IronMindAccessibilityService : AccessibilityService() {
         val taskActive = isTaskActive()
         if (taskActive) {
             if (pkg in blockedApps) {
+                IronMindLogger.log("AccessibilityService", "INTERCEPT_BLOCKED", mapOf("package" to pkg, "reason" to "active_mission"))
                 handleBreach(pkg, now, isDetox = false)
                 return
             }
 
             if (pkg in contextApps && pkg !in activeMissionContextApps) {
+                IronMindLogger.log("AccessibilityService", "INTERCEPT_BLOCKED_CONTEXT", mapOf("package" to pkg))
                 handleBreach(pkg, now, isDetox = false)
                 return
+            }
+            
+            if (pkg == "com.sanket_satpute_20.ironmind") {
+                // Ignore self
+            } else {
+                IronMindLogger.log("AccessibilityService", "INTERCEPT_ALLOWED", mapOf("package" to pkg))
             }
 
             if (isContentChange && pkg in BROWSER_PACKAGES) {
@@ -759,3 +769,4 @@ class IronMindAccessibilityService : AccessibilityService() {
 private fun <T> runBlockingOrNull(block: suspend () -> T): T? {
     return runCatching { runBlocking { block() } }.getOrNull()
 }
+

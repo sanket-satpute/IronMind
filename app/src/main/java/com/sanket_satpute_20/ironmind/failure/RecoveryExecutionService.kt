@@ -1,5 +1,7 @@
 package com.sanket_satpute_20.ironmind.failure
 
+import com.sanket_satpute_20.ironmind.core.logging.IronMindLogger
+
 import android.content.Context
 import android.util.Log
 import com.sanket_satpute_20.ironmind.data.IronMindDatabase
@@ -42,6 +44,7 @@ class RecoveryExecutionService(
             val currentRecovery = failureService.getCurrentRecovery()
 
             if (currentRecovery !is RecoveryState.Required) {
+                IronMindLogger.log("RecoveryExecution", "EXECUTE_SKIPPED", mapOf("reason" to "no_recovery_required"))
                 return@runCatching RecoveryExecutionResult.NoRecoveryRequired
             }
 
@@ -97,6 +100,7 @@ class RecoveryExecutionService(
             }
 
         }.getOrElse {
+            IronMindLogger.e("RecoveryExecution", "EXECUTE_FAILED", emptyMap(), it)
             Log.e(TAG, "Recovery execution failed", it)
 
             RecoveryExecutionResult.Failed(
@@ -164,6 +168,8 @@ class RecoveryExecutionService(
             taskId = action.taskId,
             retryReason = "RECOVERY_RETRY"
         )
+        
+        IronMindLogger.log("RecoveryExecution", "RETRY_TRIGGERED", mapOf("taskId" to action.taskId, "result" to result::class.simpleName))
 
         return when (result) {
             is MissionExecutionResult.Started ->
@@ -232,3 +238,4 @@ class RecoveryExecutionService(
         private const val TAG = "RecoveryExecution"
     }
 }
+
